@@ -11,6 +11,9 @@ cmake_install.cmake
 *_autogen/
 *.qrc.depends
 
+.qtcreator/
+*.user
+
 # Compiled binaries
 *.exe
 *.out
