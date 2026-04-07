@@ -2,6 +2,8 @@
 #include <QDebug>
 #include "mainwindow.h"
 #include "textoon.h"
+#include "lazybrush/lazybrush_components/window.h"
+
 
 int main(int argc, char *argv[])
 {
@@ -19,8 +21,11 @@ int main(int argc, char *argv[])
     Textoon processor;
     processor.processFolder(inputFolder);
 
-    MainWindow window;
-    window.show();
+    // MainWindow window;
+    // window.show();
+
+    lzwindow wnd;
+    wnd.show();
 
     return app.exec();
 }

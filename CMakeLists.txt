@@ -20,6 +20,23 @@ find_package(Qt6 REQUIRED COMPONENTS Widgets)
 find_package(Qt6 REQUIRED COMPONENTS Gui)
 
 # Specifies .cpp and .h files to be passed to the compiler
+
+file(GLOB LZSOURCES "lazybrush/lazybrush_components/*.cpp"
+                    "lazybrush/lazybrush_include/grid_of_quadtrees_colorizer/*.cpp")
+
+file(GLOB LZHEADERS "lazybrush/lazybrush_include/*.h"
+                    "lazybrush/lazybrush_include/*.hpp"
+                    "lazybrush/lazybrush_include/grid_of_quadtrees_colorizer/*.h"
+                    "lazybrush/lazybrush_include/grid_of_quadtrees_colorizer/*.hpp")
+
+file(GLOB PREPROCESS "lazybrush/lazybrush_include/preprocessing/*.h"
+                     "lazybrush/lazybrush_include/preprocessing/*.hpp"
+                     "lazybrush/lazybrush_include/preprocessing/*.cpp")
+
+file(GLOB THIRD_PARTY "lazybrush/lazybrush_include/third_party/maxflow/*.h"
+                      "lazybrush/lazybrush_include/third_party/maxflow/*.hpp"
+                      "lazybrush/lazybrush_include/third_party/maxflow/*.cpp")
+
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/mainwindow.cpp
@@ -29,6 +46,10 @@ add_executable(${PROJECT_NAME}
     src/textoon.h
 
     util/obj_loader.h
+    ${LZHEADERS}
+    ${LZSOURCES}
+    ${PREPROCESS}
+    ${THIRD_PARTY}
 )
 
 # Allows you to include files from within those directories, without prefixing their filepaths
