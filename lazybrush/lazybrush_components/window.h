@@ -21,6 +21,7 @@
 #include <QWidget>
 
 #include <lazybrush/lazybrush_include/grid_of_quadtrees_colorizer/colorization_context.hpp>
+#include "src/scribblecontext.h"
 
 class scribble;
 class colorizer_scribble;
@@ -38,17 +39,22 @@ extern const unsigned char the_palette[128][3];
 
 class lzwindow : public QWidget
 {
-    Q_OBJECT
+    Q_OBJECT    
 
 public:
     lzwindow();
     ~lzwindow();
+    explicit lzwindow(ScribbleContext* ctx, QWidget* parent = nullptr);
+
 
 protected:
     bool
     eventFilter(QObject *o, QEvent *e) override;
 
 private:
+    ScribbleContext* scribble_context;
+
+
     enum painting_device_types
     {
         painting_device_type_none,

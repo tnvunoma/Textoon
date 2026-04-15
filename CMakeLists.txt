@@ -42,6 +42,8 @@ add_executable(${PROJECT_NAME}
     src/mainwindow.cpp
     src/textoon.cpp
 
+    src/scribblecontext.h
+    src/scribblecontext.cpp
     src/mainwindow.h
     src/textoon.h
 

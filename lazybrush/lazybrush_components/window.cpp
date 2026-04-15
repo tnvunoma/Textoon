@@ -32,8 +32,30 @@
 #include <QElapsedTimer>
 #include <QTabletEvent>
 
+
 lzwindow::lzwindow()
     : position_(0.0, 0.0)
+    , scale_(1.0)
+    , last_mouse_position_(0, 0)
+    , is_dragging_(false)
+    , last_painting_position_(0, 0)
+    , is_painting_(false)
+    , painting_device_(painting_device_type_none)
+    , visualization_mode_(visualization_modes::visualization_mode_composed_image)
+    , brush_size_(20)
+    , selected_cell_(nullptr)
+    , selected_color_index_(0)
+    , selected_background_color_index_(-1)
+    , use_implicit_scribble_(false)
+    , show_scribbles_(true)
+{
+    setup_ui_();
+}
+
+lzwindow::lzwindow(ScribbleContext* ctx, QWidget* parent)
+    : QWidget(parent)
+    , scribble_context(ctx)
+    , position_(0.0, 0.0)
     , scale_(1.0)
     , last_mouse_position_(0, 0)
     , is_dragging_(false)
@@ -60,6 +82,7 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
 {
     if (o == widget_container_image_)
     {
+
         if (e->type() == QEvent::Paint)
         {
             QPainter painter(widget_container_image_);
@@ -374,6 +397,7 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
             {
                 colorization_context_.append_scribble(colorizer_scribble(scribbles_.back(), selected_color_index_));
 
+
                 is_painting_ = false;
                 painting_device_ = painting_device_type_none;
 
@@ -385,7 +409,6 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
             }
 
             return true;
-
         }
         else if (e->type() == QEvent::TabletPress && !is_dragging_ && !is_painting_)
         {
@@ -437,7 +460,10 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
         else if (e->type() == QEvent::TabletRelease && is_painting_ && painting_device_ == painting_device_type_pen)
         {
             colorization_context_.append_scribble(colorizer_scribble(scribbles_.back(), selected_color_index_));
-
+            if (scribble_context)
+            {
+                scribble_context->storeScribbles(scribbles_);
+            }
             is_painting_ = false;
             painting_device_ = painting_device_type_none;
 

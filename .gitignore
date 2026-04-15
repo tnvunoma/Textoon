@@ -19,3 +19,6 @@ cmake_install.cmake
 *.out
 *.o
 *.obj
+
+# misc
+test
