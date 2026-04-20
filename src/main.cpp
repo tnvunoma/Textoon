@@ -2,7 +2,7 @@
 #include <QDebug>
 #include "mainwindow.h"
 #include "textoon.h"
-#include "lazybrush/lazybrush_components/window.h"
+#include "src/scribblecontext.h"
 
 
 int main(int argc, char *argv[])
@@ -18,14 +18,14 @@ int main(int argc, char *argv[])
 
     QString inputFolder = args[1];
 
+
+    ScribbleContext* scribble_context = new ScribbleContext();
+
     Textoon processor;
     processor.processFolder(inputFolder);
 
-    MainWindow window;
+    MainWindow window = MainWindow(nullptr, scribble_context);
     window.show();
-
-    // lzwindow wnd;
-    // wnd.show();
 
     return app.exec();
 }

@@ -42,10 +42,9 @@ class lzwindow : public QWidget
     Q_OBJECT    
 
 public:
-    lzwindow();
-    ~lzwindow();
-    explicit lzwindow(ScribbleContext* ctx, QWidget* parent = nullptr);
+    explicit lzwindow(ScribbleContext* scribble_context = nullptr);
 
+    ~lzwindow();
 
 protected:
     bool
@@ -53,8 +52,6 @@ protected:
 
 private:
     ScribbleContext* scribble_context;
-
-
     enum painting_device_types
     {
         painting_device_type_none,

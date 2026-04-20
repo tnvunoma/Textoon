@@ -18,22 +18,20 @@ private:
 
 public:
     QVector<ScribbleInfo> saved_scribbles;
+    QSize size;
+    QImage combined_scribbles;
 
     explicit ScribbleContext(QObject* parent = nullptr)
         : QObject(parent)
     {
     }
 
-    void storeScribbles(const QVector<scribble>& scribbles)
-    {
-        saved_scribbles.clear();
+    //~ScribbleContext();
 
-        for (const scribble& s : scribbles)
-        {
-            saved_scribbles.push_back({s.image(), s.rect()});
-        }
-        emit scribbleAdded();
-    }
-signals:
-    void scribbleAdded();
+    void storeScribbles(const QVector<scribble>& scribbles, const QSize m_size = QSize());
+    void saveScribblesWithImageSize();
+    void saveScribblesWithoutImageSize();
 };
+
+//extern ScribbleContext scribble_context;
+

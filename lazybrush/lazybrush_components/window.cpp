@@ -33,28 +33,9 @@
 #include <QTabletEvent>
 
 
-lzwindow::lzwindow()
-    : position_(0.0, 0.0)
-    , scale_(1.0)
-    , last_mouse_position_(0, 0)
-    , is_dragging_(false)
-    , last_painting_position_(0, 0)
-    , is_painting_(false)
-    , painting_device_(painting_device_type_none)
-    , visualization_mode_(visualization_modes::visualization_mode_composed_image)
-    , brush_size_(20)
-    , selected_cell_(nullptr)
-    , selected_color_index_(0)
-    , selected_background_color_index_(-1)
-    , use_implicit_scribble_(false)
-    , show_scribbles_(true)
-{
-    setup_ui_();
-}
 
-lzwindow::lzwindow(ScribbleContext* ctx, QWidget* parent)
-    : QWidget(parent)
-    , scribble_context(ctx)
+lzwindow::lzwindow(ScribbleContext* scribble_context) :
+    scribble_context(scribble_context)
     , position_(0.0, 0.0)
     , scale_(1.0)
     , last_mouse_position_(0, 0)
@@ -396,7 +377,11 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
             if (is_painting_ && painting_device_ == painting_device_type_mouse)
             {
                 colorization_context_.append_scribble(colorizer_scribble(scribbles_.back(), selected_color_index_));
+                //if (scribble_context)
+                //{
+                    scribble_context->storeScribbles(scribbles_, original_image_.size());
 
+                //}
 
                 is_painting_ = false;
                 painting_device_ = painting_device_type_none;
@@ -460,10 +445,12 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
         else if (e->type() == QEvent::TabletRelease && is_painting_ && painting_device_ == painting_device_type_pen)
         {
             colorization_context_.append_scribble(colorizer_scribble(scribbles_.back(), selected_color_index_));
-            if (scribble_context)
-            {
+            if (!original_image_.isNull()){
+                scribble_context->storeScribbles(scribbles_, original_image_.size());
+            } else {
                 scribble_context->storeScribbles(scribbles_);
             }
+
             is_painting_ = false;
             painting_device_ = painting_device_type_none;
 
