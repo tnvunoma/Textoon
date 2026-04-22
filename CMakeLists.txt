@@ -67,7 +67,7 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 
 # This allows you to `#include "Eigen/..."`
 target_include_directories(${PROJECT_NAME} PRIVATE
-    Eigen
+    ${CMAKE_SOURCE_DIR}/Eigen
 )
 
 # Specifies other files

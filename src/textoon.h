@@ -3,6 +3,9 @@
 
 #include <QString>
 #include <QImage>
+#include <Eigen/Dense>
+
+using namespace Eigen;
 
 class Textoon
 {
@@ -17,7 +20,6 @@ public:
     };
 
 private:
-
 
     QString outputFolder;
 

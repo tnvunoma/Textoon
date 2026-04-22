@@ -23,3 +23,4 @@ cmake_install.cmake
 # misc
 test
 saved_scribbles
+eigen/
