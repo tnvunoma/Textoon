@@ -2,8 +2,7 @@ from typing import List
 import numpy as np
 from copy import deepcopy
 import matplotlib.pyplot as plt
-from scipy.interpolate import griddata
-from scipy.ndimage import map_coordinates
+from math import ceil
 
 
 def sum_abs_diff(source, target, point, shift, N_half):
@@ -45,7 +44,7 @@ class Point:
         self.instances.append(point)
 
     def move_to_centroid(self):
-        self.pos = centroid(self.instances, "pos")
+        self.pos = centroid(self.instances, "pos").astype(int)
 
     def push(self, source, target, N, M):
         shift_vector = (0, 0)
@@ -111,44 +110,78 @@ class Square:
 
 class Lattice:
     def __init__(self, source: np.ndarray, target: np.ndarray, grid_size: int = 10):
+        self.source = source
+        self.target = target
+
         self.points: List[List[Point]] = []
         self.points_flat: List[Point] = []
         self.squares: List[Square] = []
 
         H, W, C = source.shape
 
-        assert H % grid_size == 0
-        assert W % grid_size == 0
+        self.H = H
+        self.W = W
+        self.grid_size = grid_size
 
-        grid_rows = H // grid_size + 1
-        grid_cols = W // grid_size + 1
+        self.rows = ceil(H / grid_size) + 1
+        self.cols = ceil(W / grid_size) + 1
 
-        i_range = np.arange(grid_rows) * grid_size
-        j_range = np.arange(grid_cols) * grid_size
+        i_range = np.arange(self.rows) * grid_size
+        i_range = i_range.clip(0, H - 1)
+        j_range = np.arange(self.cols) * grid_size
+        j_range = j_range.clip(0, W - 1)
         I, J = np.meshgrid(i_range, j_range, indexing="ij")
         lattice_init = np.stack((I, J), axis=-1)
 
-        for i in range(grid_rows):
+        for i in range(self.rows):
             row = []
-            for j in range(grid_cols):
+            for j in range(self.cols):
                 lattice_coord = lattice_init[i, j]
                 lattice_point = Point(lattice_coord[1], lattice_coord[0])
                 self.points_flat.append(lattice_point)
                 row.append(lattice_point)
             self.points.append(row)
 
-        for i in range(grid_rows - 1):
-            for j in range(grid_cols - 1):
+        for i in range(self.rows - 1):
+            for j in range(self.cols - 1):
                 points = []
                 for r, c in corners(i, j):
                     points.append(self.points[r][c])
                 lattice_sq = Square(points)
                 self.squares.append(lattice_sq)
 
+    def correspondence_map(self) -> np.ndarray:
+        pos_grid = np.zeros((self.rows, self.cols, 2), dtype=np.float64)
+        for i in range(self.rows):
+            for j in range(self.cols):
+                pos_grid[i, j] = self.points[i][j].pos
+
+        ys, xs = np.meshgrid(np.arange(self.H), np.arange(self.W), indexing="ij")
+        i_idx = ys // self.grid_size
+        j_idx = xs // self.grid_size
+
+        u = ((xs - j_idx * self.grid_size) / self.grid_size)[..., None]
+        v = ((ys - i_idx * self.grid_size) / self.grid_size)[..., None]
+
+        P00 = pos_grid[i_idx, j_idx]
+        P01 = pos_grid[i_idx, j_idx + 1]
+        P10 = pos_grid[i_idx + 1, j_idx]
+        P11 = pos_grid[i_idx + 1, j_idx + 1]
+
+        new_xy = (
+            (1 - u) * (1 - v) * P00
+            + u * (1 - v) * P01
+            + (1 - u) * v * P10
+            + u * v * P11
+        )
+
+        corr = np.stack([new_xy[..., 1], new_xy[..., 0]], axis=-1)
+        return corr
+
 
 source = plt.imread("source.png")[:, :, :3]
 target = plt.imread("target.png")[:, :, :3]
-test = Lattice(source, target, 10)
+test = Lattice(source, target, 7)
 for i in range(5):
     for point in test.points_flat:
         point.push(source, target, 10, 20)
@@ -165,20 +198,13 @@ H, W, C = source.shape
 pts_target = final_pos
 pts_source = init_pos
 
-grid_y, grid_x = np.mgrid[0:H, 0:W]
-
-map_x = griddata(pts_target, pts_source[:, 0], (grid_x, grid_y), method="linear")
-map_y = griddata(pts_target, pts_source[:, 1], (grid_x, grid_y), method="linear")
-
-nan_mask = np.isnan(map_x) | np.isnan(map_y)
-map_x[nan_mask] = grid_x[nan_mask]
-map_y[nan_mask] = grid_y[nan_mask]
+ys, xs = np.meshgrid(np.arange(100), np.arange(100), indexing="ij")
+corr = test.correspondence_map()
+map_y = np.rint(corr[..., 0]).astype(int)
+map_x = np.rint(corr[..., 1]).astype(int)
 
 warped = np.zeros_like(source)
-for ch in range(C):
-    warped[..., ch] = map_coordinates(
-        source[..., ch], [map_y, map_x], order=1, mode="constant", cval=1.0
-    )
+warped[map_y, map_x] = source[ys, xs]
 
 fig, axes = plt.subplots(1, 3, figsize=(21, 7))
 
