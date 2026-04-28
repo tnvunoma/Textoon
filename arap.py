@@ -6,32 +6,30 @@ from scipy.interpolate import griddata
 from scipy.ndimage import map_coordinates
 
 
-def sum_abs_diff(source, target, pix, shift, N_half):
-    x, y = pix.astype(int)
+def sum_abs_diff(source, target, point, shift, N_half):
+    sx, sy = point.init.astype(int)
+    tx, ty = point.pos.astype(int)
     dx, dy = shift
     H, W = source.shape[:2]
 
-    r_y_min = max(-N_half, -y, -y - dy)
-    r_y_max = min(N_half, H - y, H - y - dy)
-
-    r_x_min = max(-N_half, -x, -x - dx)
-    r_x_max = min(N_half, W - x, W - x - dx)
-
+    r_y_min = max(-N_half, -sy, -ty - dy)
+    r_y_max = min(N_half, H - sy, H - ty - dy)
+    r_x_min = max(-N_half, -sx, -tx - dx)
+    r_x_max = min(N_half, W - sx, W - tx - dx)
     if r_y_min >= r_y_max or r_x_min >= r_x_max:
         return 1e9
 
-    src_patch = source[y + r_y_min : y + r_y_max, x + r_x_min : x + r_x_max]
+    src_patch = source[sy + r_y_min : sy + r_y_max, sx + r_x_min : sx + r_x_max]
     tgt_patch = target[
-        y + dy + r_y_min : y + dy + r_y_max, x + dx + r_x_min : x + dx + r_x_max
+        ty + dy + r_y_min : ty + dy + r_y_max, tx + dx + r_x_min : tx + dx + r_x_max
     ]
-
     return np.mean(np.abs(src_patch - tgt_patch))
 
 
 class Point:
     def __init__(self, x, y):
-        self.pos: np.ndarray = np.array([x, y])
-        self.init: np.ndarray = np.array([x, y])
+        self.pos: np.ndarray = np.array([x, y], dtype=np.float64)
+        self.init: np.ndarray = np.array([x, y], dtype=np.float64)
         self.instances: List[Point] = []
 
     def __repr__(self):
@@ -47,17 +45,15 @@ class Point:
         self.instances.append(point)
 
     def move_to_centroid(self):
-        if len(self.instances) == 0:
-            return
-        self.pos = centroid(self.instances)
+        self.pos = centroid(self.instances, "pos")
 
     def push(self, source, target, N, M):
         shift_vector = (0, 0)
-        min_sum = sum_abs_diff(source, target, self.pos, shift_vector, N // 2)
+        min_sum = sum_abs_diff(source, target, self, shift_vector, N // 2)
         for r in range(-M // 2, M // 2 + 1):
             for c in range(-M // 2, M // 2 + 1):
                 test_shift = (c, r)
-                test_sum = sum_abs_diff(source, target, self.pos, test_shift, N // 2)
+                test_sum = sum_abs_diff(source, target, self, test_shift, N // 2)
                 if test_sum < min_sum:
                     shift_vector = test_shift
                     min_sum = test_sum
@@ -68,10 +64,10 @@ def perp(pos):
     return np.array([pos[1], -pos[0]])
 
 
-def centroid(points: List[Point]) -> np.ndarray:
+def centroid(points: List[Point], attr: str = "pos") -> np.ndarray:
     res = np.zeros_like(points[0].pos).astype(np.float64)
     for point in points:
-        res += point.pos
+        res += eval(f"point.{attr}")
     return res / len(points)
 
 
@@ -91,16 +87,16 @@ class Square:
         return f"""Square:\n\t{self.global_points[0]}\n\t{self.global_points[1]}\n\t{self.global_points[2]}\n\t{self.global_points[3]}\n"""
 
     def regularize(self):
-        p_c = centroid(self.global_points)
-        q_c = centroid(self.local_points)
+        p_c = centroid(self.local_points, "init")
+        q_c = centroid(self.global_points, "pos")
 
         a = 0.0
         b = 0.0
         for i in range(4):
-            p_hat = self.global_points[i].pos - p_c
-            q_hat = self.local_points[i].pos - q_c
-            a += p_hat @ q_hat
-            b += p_hat @ perp(q_hat)
+            p_hat = self.local_points[i].init - p_c
+            q_hat = self.global_points[i].pos - q_c
+            a += q_hat @ p_hat
+            b += q_hat @ perp(p_hat)
 
         mu = np.sqrt(a**2 + b**2)
         if mu < 1e-10:
@@ -109,8 +105,8 @@ class Square:
         R = np.array([[a, -b], [b, a]]) / mu
 
         for i in range(4):
-            q_hat = self.local_points[i].pos - q_c
-            self.local_points[i].pos = R @ q_hat + p_c
+            p_hat = self.local_points[i].init - p_c
+            self.local_points[i].pos = R @ p_hat + q_c
 
 
 class Lattice:
@@ -124,11 +120,11 @@ class Lattice:
         assert H % grid_size == 0
         assert W % grid_size == 0
 
-        grid_rows = H // grid_size - 1
-        grid_cols = W // grid_size - 1
+        grid_rows = H // grid_size + 1
+        grid_cols = W // grid_size + 1
 
-        i_range = np.arange(grid_rows) * grid_size + grid_size
-        j_range = np.arange(grid_cols) * grid_size + grid_size
+        i_range = np.arange(grid_rows) * grid_size
+        j_range = np.arange(grid_cols) * grid_size
         I, J = np.meshgrid(i_range, j_range, indexing="ij")
         lattice_init = np.stack((I, J), axis=-1)
 
@@ -153,14 +149,14 @@ class Lattice:
 source = plt.imread("source.png")[:, :, :3]
 target = plt.imread("target.png")[:, :, :3]
 test = Lattice(source, target, 10)
-for point in test.points_flat:
-    point.push(source, target, 10, 20)
+for i in range(5):
+    for point in test.points_flat:
+        point.push(source, target, 10, 20)
 
-for square in test.squares:
-    square.regularize()
-
-for point in test.points_flat:
-    point.move_to_centroid()
+    for square in test.squares:
+        square.regularize()
+    for point in test.points_flat:
+        point.move_to_centroid()
 
 init_pos = np.array([p.init for p in test.points_flat], dtype=float)
 final_pos = np.array([p.pos for p in test.points_flat], dtype=float)
