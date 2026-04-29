@@ -32,7 +32,7 @@ private:
 
     std::vector<std::vector<Textoon::UV>> initUV(int w, int h);
 
-    std::vector<std::vector<QPointF>> buildW12(
+    std::vector<std::vector<QPointF>> buildMap(
         const std::vector<std::vector<int>>& map_x,
         const std::vector<std::vector<int>>& map_y);
 

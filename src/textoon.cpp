@@ -110,7 +110,7 @@ void Textoon::processFrames(const QString &inputFolder)
         auto map_x = loadCsv("map_x_" + std::to_string(i) + ".csv");
         auto map_y = loadCsv("map_y_" + std::to_string(i) + ".csv");
 
-        auto W = buildW12(map_x, map_y);
+        auto W = buildMap(map_x, map_y);
 
         // Transfer scribbles
         curr.scribbles = warpImage(prev.scribbles, W);
@@ -149,7 +149,7 @@ std::vector<std::vector<Textoon::UV>> Textoon::initUV(int w, int h)
 }
 
 std::vector<std::vector<QPointF>>
-Textoon::buildW12(
+Textoon::buildMap(
     const std::vector<std::vector<int>>& map_x,
     const std::vector<std::vector<int>>& map_y)
 {
