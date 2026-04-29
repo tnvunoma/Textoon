@@ -144,7 +144,7 @@ class Lattice:
                 lattice_sq = Square(points)
                 self.squares.append(lattice_sq)
 
-    def fit(self, N=10, M=20, iters=100):
+    def fit(self, N=10, M=20, iters=30):
         for _ in range(iters):
             for point in self.points_flat:
                 point.push(self.source, self.target, N, M)
@@ -185,52 +185,13 @@ target = plt.imread("dummy_data/arap_test/small_walk_0002.png")[:, :, :3]
 
 grid_size = 20
 M = 40
-iters = 5
+iters = 20
 
 test = Lattice(source, target, grid_size)
 test.fit(grid_size, M, iters)
-
-init_pos = np.array([p.init for p in test.points_flat], dtype=float)
-final_pos = np.array([p.pos for p in test.points_flat], dtype=float)
-
-H, W, C = source.shape
-pts_target = final_pos
-pts_source = init_pos
-
-ys, xs = np.meshgrid(np.arange(663), np.arange(420), indexing="ij")
 corr = test.correspondence_map()
 map_y = np.rint(corr[..., 0]).astype(int)
 map_x = np.rint(corr[..., 1]).astype(int)
 
-warped = np.zeros_like(source)
-warped[map_y, map_x] = source[ys, xs]
-
-fig, axes = plt.subplots(1, 3, figsize=(21, 7))
-
-axes[0].imshow(source)
-axes[0].scatter(init_pos[:, 0], init_pos[:, 1], color="red", s=14, zorder=3)
-axes[0].set_title("Source")
-axes[0].axis("off")
-
-axes[1].imshow(target)
-axes[1].set_title("Target")
-axes[1].axis("off")
-
-axes[2].imshow(np.clip(warped, 0, 1))
-axes[2].scatter(final_pos[:, 0], final_pos[:, 1], color="blue", s=14, zorder=3)
-for ip, fp in zip(init_pos, final_pos):
-    if np.linalg.norm(fp - ip) > 0.5:
-        axes[2].annotate(
-            "",
-            xy=(fp[0], fp[1]),
-            xytext=(ip[0], ip[1]),
-            arrowprops=dict(
-                arrowstyle="->", color="green", lw=0.7, shrinkA=0, shrinkB=0
-            ),
-            zorder=2,
-        )
-axes[2].set_title("Warped source")
-axes[2].axis("off")
-
-plt.tight_layout()
-plt.show()
+np.savetxt("test_map_x.csv", map_x, fmt="%i", delimiter=",")
+np.savetxt("test_map_y.csv", map_y, fmt="%i", delimiter=",")

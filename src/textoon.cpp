@@ -7,6 +7,7 @@
 #include <QColor>
 #include <queue>
 #include <QPoint>
+#include <fstream>
 
 Textoon::Textoon()
 {
@@ -180,6 +181,29 @@ double evaluateTPS(
     return sum + tps.a[0] + tps.a[1] * x.x() + tps.a[2] * x.y();
 }
 
+static std::vector<std::vector<int>> loadCsv(const std::string &path)
+{
+    std::vector<std::vector<int>> data;
+    std::ifstream f(path);
+    std::string line;
+    while (std::getline(f, line))
+    {
+        if (line.empty())
+            continue;
+        std::vector<int> row;
+        std::stringstream ss(line);
+        std::string cell;
+        while (std::getline(ss, cell, ','))
+        {
+            if (!cell.empty())
+                row.push_back(std::stoi(cell));
+        }
+        if (!row.empty())
+            data.push_back(std::move(row));
+    }
+    return data;
+}
+
 QImage Textoon::transferUV(const QImage &F1)
 {
     int w = F1.width();
@@ -199,10 +223,22 @@ QImage Textoon::transferUV(const QImage &F1)
     float cx = w / 2.0f;
     float cy = h / 2.0f;
 
-    auto rotate = [&](float x, float y) {
-        float dx = x - cx, dy = y - cy;
-        return QPointF(cos(angle)*dx - sin(angle)*dy + cx,
-                       sin(angle)*dx + cos(angle)*dy + cy);
+    static const std::vector<std::vector<int>> map_x = loadCsv("test_map_x.csv");
+    static const std::vector<std::vector<int>> map_y = loadCsv("test_map_y.csv");
+
+    auto rotate = [&](float x, float y)
+    {
+        int ix = static_cast<int>(std::lround(x));
+        int iy = static_cast<int>(std::lround(y));
+
+        if (iy < 0 || iy >= static_cast<int>(map_x.size()) ||
+            ix < 0 || ix >= static_cast<int>(map_x[iy].size()))
+        {
+            return QPointF(x, y);
+        }
+
+        return QPointF(static_cast<float>(map_x[iy][ix]),
+                       static_cast<float>(map_y[iy][ix]));
     };
 
     std::vector<std::vector<UV>> T1(h, std::vector<UV>(w));
