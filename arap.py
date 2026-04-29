@@ -118,18 +118,12 @@ class Lattice:
         self.squares: List[Square] = []
 
         H, W, C = source.shape
-
-        self.H = H
-        self.W = W
-        self.grid_size = grid_size
-
+        self.H, self.W, self.grid_size = H, W, grid_size
         self.rows = ceil(H / grid_size) + 1
         self.cols = ceil(W / grid_size) + 1
 
-        i_range = np.arange(self.rows) * grid_size
-        i_range = i_range.clip(0, H - 1)
-        j_range = np.arange(self.cols) * grid_size
-        j_range = j_range.clip(0, W - 1)
+        i_range = (np.arange(self.rows) * grid_size).clip(0, H - 1)
+        j_range = (np.arange(self.cols) * grid_size).clip(0, W - 1)
         I, J = np.meshgrid(i_range, j_range, indexing="ij")
         lattice_init = np.stack((I, J), axis=-1)
 
@@ -149,6 +143,15 @@ class Lattice:
                     points.append(self.points[r][c])
                 lattice_sq = Square(points)
                 self.squares.append(lattice_sq)
+
+    def fit(self, N=10, M=20, iters=100):
+        for _ in range(iters):
+            for point in self.points_flat:
+                point.push(self.source, self.target, N, M)
+            for sq in self.squares:
+                sq.regularize()
+            for p in self.points_flat:
+                p.move_to_centroid()
 
     def correspondence_map(self) -> np.ndarray:
         pos_grid = np.zeros((self.rows, self.cols, 2), dtype=np.float64)
@@ -174,22 +177,18 @@ class Lattice:
             + (1 - u) * v * P10
             + u * v * P11
         )
-
-        corr = np.stack([new_xy[..., 1], new_xy[..., 0]], axis=-1)
-        return corr
+        return np.stack([new_xy[..., 1], new_xy[..., 0]], axis=-1)
 
 
-source = plt.imread("source.png")[:, :, :3]
-target = plt.imread("target.png")[:, :, :3]
-test = Lattice(source, target, 7)
-for i in range(5):
-    for point in test.points_flat:
-        point.push(source, target, 10, 20)
+source = plt.imread("dummy_data/arap_test/small_walk_0000.png")[:, :, :3]
+target = plt.imread("dummy_data/arap_test/small_walk_0002.png")[:, :, :3]
 
-    for square in test.squares:
-        square.regularize()
-    for point in test.points_flat:
-        point.move_to_centroid()
+grid_size = 20
+M = 40
+iters = 5
+
+test = Lattice(source, target, grid_size)
+test.fit(grid_size, M, iters)
 
 init_pos = np.array([p.init for p in test.points_flat], dtype=float)
 final_pos = np.array([p.pos for p in test.points_flat], dtype=float)
@@ -198,7 +197,7 @@ H, W, C = source.shape
 pts_target = final_pos
 pts_source = init_pos
 
-ys, xs = np.meshgrid(np.arange(100), np.arange(100), indexing="ij")
+ys, xs = np.meshgrid(np.arange(663), np.arange(420), indexing="ij")
 corr = test.correspondence_map()
 map_y = np.rint(corr[..., 0]).astype(int)
 map_x = np.rint(corr[..., 1]).astype(int)
