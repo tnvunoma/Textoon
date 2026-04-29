@@ -47,7 +47,12 @@ add_executable(${PROJECT_NAME}
     src/mainwindow.h
     src/textoon.h
 
+    src/depthmapgenerator.h
+    src/depthmapgenerator.cpp
+
     util/obj_loader.h
+    util/vector_utils.h
+
     ${LZHEADERS}
     ${LZSOURCES}
     ${PREPROCESS}

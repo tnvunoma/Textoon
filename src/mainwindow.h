@@ -12,7 +12,7 @@ class MainWindow : public QMainWindow
 private:
     ScribbleContext* scribble_context;
     lzwindow* lazyb_window;
-    QPushButton* save_button_;
+    QPushButton* save_button;
 
 public:
     explicit MainWindow(QWidget *parent = nullptr, ScribbleContext* ctx = nullptr);

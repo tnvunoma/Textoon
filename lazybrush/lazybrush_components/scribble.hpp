@@ -101,6 +101,9 @@ public:
     label_type
     label() const;
 
+    scribble
+    getScribble() const;
+
 private:
     scribble scribble_;
     label_type label_;

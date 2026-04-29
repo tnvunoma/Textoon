@@ -19,7 +19,7 @@
 #include "scribble.hpp"
 #include "lazybrush/lazybrush_include/preprocessing/threshold.hpp"
 #include "lazybrush/lazybrush_include/preprocessing/skeleton.hpp"
-
+#include <iostream>
 //#include "../preprocessing/skeleton.hpp"
 
 #include <QPushButton>
@@ -48,6 +48,7 @@ lzwindow::setup_ui_()
     QPushButton * button_open_image = new QPushButton("Open Image...");
     QPushButton * button_save_labeling_image = new QPushButton("Save Colorization Image...");
     QPushButton * button_save_composed_image = new QPushButton("Save Composed Image...");
+    QPushButton* save_button = new QPushButton("Save Scribbles", this);
 
     QVBoxLayout * layout_visualization = new QVBoxLayout;
     QVBoxLayout * layout_visualization_contents = new QVBoxLayout;
@@ -97,6 +98,7 @@ lzwindow::setup_ui_()
                 layout_io_contents->addWidget(button_open_image);
                 layout_io_contents->addWidget(button_save_labeling_image);
                 layout_io_contents->addWidget(button_save_composed_image);
+                layout_io_contents->addWidget(save_button);
             layout_io->addLayout(layout_io_contents);
 
             layout_visualization->setContentsMargins(0, 0, 0, 0);
@@ -184,6 +186,8 @@ lzwindow::setup_ui_()
                 }
             }
 
+            scribble_context->storeSampledPoints(image_points);
+
             // original_image_ = i.convertToFormat(QImage::Format_Grayscale8);
             // preprocessed_image_ = QImage(i.width(), i.height(), QImage::Format_Grayscale8);
 
@@ -256,6 +260,9 @@ lzwindow::setup_ui_()
         }
     );
 
+    connect(save_button, &QPushButton::clicked,
+            this, &lzwindow::onSaveScribblesClicked);
+
     connect
     (
         combo_box_visualization,
@@ -318,4 +325,40 @@ lzwindow::setup_ui_()
             widget_container_image_->update();
         }
     );
+}
+
+void lzwindow::onSaveScribblesClicked(){
+    if (scribble_context->size.isEmpty()){
+        scribble_context->saveScribblesWithoutImageSize();
+    } else {
+        scribble_context->saveScribblesWithImageSize();
+
+        QVector<QImage> segmentation_images;
+        QVector<ScribbleInfo> svd{scribble_context->saved_scribbles};
+        for (const ScribbleInfo& scrib : svd){
+            segmentation_images.push_back(scribble_context->colorize(scrib));
+            QDir().mkpath("saved_scribbles");
+
+            QString filename = "saved_scribbles/segmentation_" + QString::number(scrib.label()) + ".png";
+
+            if (!segmentation_images.back().save(filename)) {
+                std::cerr << "Failed to save scribbles." << std::endl;
+            }
+        }
+        // ScribbleInfo scrib{scribble_context->saved_scribbles.back()};
+
+        // scribble_context->colorize(scribble_context->saved_scribbles.back());
+
+        // QImage segmnt{scribble_context->colorize(scribble_context->saved_scribbles.back())};
+
+        // ScribbleInfo n_scrib{scribble_context->createScribblesFromQImage(scribble_context->combined_scribbles, scrib.label())};
+
+        // QDir().mkpath("saved_scribbles");
+
+        // QString filename = "saved_scribbles/segmentation.png";
+
+        // if (!segmnt.save(filename)) {
+        //     std::cerr << "Failed to save scribbles." << std::endl;
+        // }
+    }
 }

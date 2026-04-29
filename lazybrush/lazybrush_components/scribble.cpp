@@ -200,3 +200,8 @@ colorizer_scribble::label() const
 {
     return label_;
 }
+
+scribble
+colorizer_scribble::getScribble() const{
+    return scribble_;
+}

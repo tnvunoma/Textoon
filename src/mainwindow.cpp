@@ -13,16 +13,16 @@ MainWindow::MainWindow(QWidget *parent, ScribbleContext* ctx)
     QWidget* central = new QWidget(this);
     QVBoxLayout* layout = new QVBoxLayout(central);
 
-    save_button_ = new QPushButton("Save Scribbles", this);
-    layout->addWidget(save_button_);
+    save_button = new QPushButton("Save Scribbles", this);
+    layout->addWidget(save_button);
 
     setCentralWidget(central);
 
-    connect(save_button_, &QPushButton::clicked,
+    connect(save_button, &QPushButton::clicked,
             this, &MainWindow::onSaveScribblesClicked);
 
-    lazyb_window = new lzwindow(scribble_context);
-    lazyb_window->show();
+    // lazyb_window = new lzwindow(scribble_context);
+    // lazyb_window->show();
 }
 
 void MainWindow::onSaveScribblesClicked(){
@@ -30,5 +30,6 @@ void MainWindow::onSaveScribblesClicked(){
         scribble_context->saveScribblesWithoutImageSize();
     } else {
         scribble_context->saveScribblesWithImageSize();
+        scribble_context->colorize(scribble_context->saved_scribbles.back());
     }
 }

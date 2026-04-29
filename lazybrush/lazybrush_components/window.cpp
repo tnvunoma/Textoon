@@ -376,10 +376,13 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
             is_dragging_ = false;
             if (is_painting_ && painting_device_ == painting_device_type_mouse)
             {
-                colorization_context_.append_scribble(colorizer_scribble(scribbles_.back(), selected_color_index_));
+                colorizer_scribble colorized{colorizer_scribble(scribbles_.back(), selected_color_index_)};
+                colorization_context_.append_scribble(colorized);
                 //if (scribble_context)
                 //{
-                    scribble_context->storeScribbles(scribbles_, original_image_.size());
+                QVector<colorizer_scribble> colorizedScribbles(colorization_context_.scribbles().begin(),colorization_context_.scribbles().end());
+                    scribble_context->storeScribbles(colorizedScribbles,
+                                                 original_image_.size());
 
                 //}
 
@@ -445,11 +448,12 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
         else if (e->type() == QEvent::TabletRelease && is_painting_ && painting_device_ == painting_device_type_pen)
         {
             colorization_context_.append_scribble(colorizer_scribble(scribbles_.back(), selected_color_index_));
-            if (!original_image_.isNull()){
-                scribble_context->storeScribbles(scribbles_, original_image_.size());
-            } else {
-                scribble_context->storeScribbles(scribbles_);
-            }
+            //if (!original_image_.isNull()){
+            QVector<colorizer_scribble> colorizedScribbles(colorization_context_.scribbles().begin(),colorization_context_.scribbles().end());
+            scribble_context->storeScribbles(colorizedScribbles,
+                                             original_image_.size());            // } else {
+            //     scribble_context->storeScribbles(scribbles_);
+            // }
 
             is_painting_ = false;
             painting_device_ = painting_device_type_none;
@@ -560,6 +564,7 @@ lzwindow::transform_pen_position_(const QPoint &pen_position) const
     QPointF const transformed_pen_positionF = QPointF(pen_position - (position_ + widget_center)) / scale_ - image_position;
     return QPoint(static_cast<int>(transformed_pen_positionF.x()), static_cast<int>(transformed_pen_positionF.y()));
 }
+
 
 void
 lzwindow::colorize()

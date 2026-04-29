@@ -98,6 +98,7 @@ private:
     void
     setup_ui_();
 
+    // proxy colorize methods
     int
     pressure_to_radius_(qreal pressure) const;
     QPoint
@@ -114,6 +115,9 @@ private:
     QPoint_to_point_type(QPoint const & point);
     rect_type
     QRect_to_rect_type(QRect const & rect);
+
+    // ui methods
+    void onSaveScribblesClicked();
 };
 
 #endif
