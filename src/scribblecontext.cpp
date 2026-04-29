@@ -147,12 +147,13 @@ QRect rectFromImage(const QImage& image)
     return rect;
 }
 
-ScribbleInfo ScribbleContext::createScribblesFromQImage(QImage image, label_type label){
-    // for transformed scribbles - easily create a scribble in order to use the colorize function
+// ScribbleInfo ScribbleContext::createScribblesFromQImage(QImage image, label_type label){
+//     // for transformed scribbles - easily create a scribble in order to use the colorize function
 
-    QRect rect = rectFromImage(image);
-    return ScribbleInfo(image.copy(rect), rect, label);
-}
+//     QRect rect = rectFromImage(image);
+//     return ScribbleInfo(image.copy(rect), rect, label);
+// }
+
 
 // proxy colorize method
 QImage ScribbleContext::colorize(const ScribbleInfo& scribble){
@@ -205,3 +206,60 @@ QImage ScribbleContext::colorize(const ScribbleInfo& scribble){
 
     return segmnt;
 }
+
+QImage ScribbleContext::imgColorize(const QImage& scribbles)
+{
+    int w = scribbles.width();
+    int h = scribbles.height();
+
+    if (w <= 0 || h <= 0)
+        return QImage();
+
+    textoons_colorization_context small_context(
+        0,
+        0,
+        w,
+        h,
+        cell_size,
+        points);
+
+    small_context.append_scribble(
+        ScribbleInfo(scribbles,
+                     QRect(0, 0, w, h),
+                     0)
+        );
+
+    QImage segmnt(w, h, QImage::Format_RGB32);
+    segmnt.fill(Qt::black);
+
+    auto labeling =
+        lazybrush::grid_of_quadtrees_colorizer::colorize(small_context, true);
+
+    QPainter painter(&segmnt);
+    painter.setCompositionMode(QPainter::CompositionMode_Source);
+
+    for (const auto& node : labeling)
+    {
+        label_type label = node.second;
+
+        if (label == textoons_colorization_context::label_undefined ||
+            label == textoons_colorization_context::label_implicit_surrounding)
+            continue;
+
+        if (label < 0 || label >= 128)
+            continue;
+
+        QColor c(
+            the_palette[label][0],
+            the_palette[label][1],
+            the_palette[label][2]
+            );
+
+        painter.fillRect(rect_type_to_QRect(node.first), c);
+    }
+
+    painter.end();
+    return segmnt;
+}
+
+

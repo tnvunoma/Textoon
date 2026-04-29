@@ -128,6 +128,9 @@ public:
     ScribbleInfo createScribblesFromQImage(QImage image, label_type label);
     void saveScribblesWithImageSize();
     void saveScribblesWithoutImageSize();
+
+    QImage imgColorize(const QImage& scribbles);
+
 };
 
 //extern ScribbleContext scribble_context;

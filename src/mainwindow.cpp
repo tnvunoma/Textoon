@@ -5,11 +5,9 @@
 #include <QPainter>
 
 MainWindow::MainWindow(QWidget *parent, ScribbleContext* ctx)
-    : QMainWindow(parent)
-
+    : QMainWindow(parent),
+    scribble_context(ctx)
 {
-    scribble_context = ctx;
-
     QWidget* central = new QWidget(this);
     QVBoxLayout* layout = new QVBoxLayout(central);
 
@@ -20,16 +18,27 @@ MainWindow::MainWindow(QWidget *parent, ScribbleContext* ctx)
 
     connect(save_button, &QPushButton::clicked,
             this, &MainWindow::onSaveScribblesClicked);
-
-    // lazyb_window = new lzwindow(scribble_context);
-    // lazyb_window->show();
 }
 
-void MainWindow::onSaveScribblesClicked(){
-    if (scribble_context->size.isEmpty()){
+void MainWindow::onSaveScribblesClicked()
+{
+    if (scribble_context->size.isEmpty())
+    {
         scribble_context->saveScribblesWithoutImageSize();
-    } else {
+    }
+    else
+    {
         scribble_context->saveScribblesWithImageSize();
-        scribble_context->colorize(scribble_context->saved_scribbles.back());
+
+        // optional debug: run LazyBrush segmentation on last scribble image
+        if (!scribble_context->saved_scribbles.isEmpty())
+        {
+            const auto& last = scribble_context->saved_scribbles.back();
+
+            QImage seg = scribble_context->imgColorize(last.original_image);
+
+            QDir().mkpath("saved_scribbles");
+            seg.save("saved_scribbles/debug_segmentation.png");
+        }
     }
 }
