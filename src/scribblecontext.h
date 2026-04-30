@@ -6,6 +6,7 @@
 #include <QObject>
 #include "lazybrush/lazybrush_include/grid_of_quadtrees_colorizer/colorizer.hpp"
 #include "lazybrush/lazybrush_include/grid_of_quadtrees_colorizer/types.hpp"
+#include <unordered_set>
 //ScribbleContext::ScribbleContext() {}
 
 
@@ -20,8 +21,8 @@ class ScribbleInfo
 public:
     // interface type for internal colorization context
 
-    QImage original_image;
-    QRect qrect;
+    QImage scrib_image;
+    QRect bounding;
     label_type _label{-1};
         // label for identification - this is how you id unique scribbles
 
@@ -29,19 +30,19 @@ public:
     ScribbleInfo();
 
     ScribbleInfo(QImage image, QRect rect, label_type label)
-        : original_image(std::move(image))
-        , qrect(rect)
+        : scrib_image(std::move(image))
+        , bounding(rect)
         , _label(label)
     {
 
         // Initialize contour points
         std::vector<point_type> points;
 
-        for (int y = 0; y < original_image.height(); ++y)
+        for (int y = 0; y < scrib_image.height(); ++y)
         {
-            for (int x = 0; x < original_image.width(); ++x)
+            for (int x = 0; x < scrib_image.width(); ++x)
             {
-                QColor c = original_image.pixelColor(x, y);
+                QColor c = scrib_image.pixelColor(x, y);
 
                 if (c.alpha() > 0)
                 {
@@ -52,7 +53,7 @@ public:
     }
 
     rect_type rect() const {
-        return rect_type(qrect.x(), qrect.y(), qrect.width(), qrect.height());
+        return rect_type(bounding.x(), bounding.y(), bounding.width(), bounding.height());
     }
 
     std::vector<point_type> points;
@@ -61,19 +62,19 @@ public:
 
     bool contains_point(point_type const& p) const
     {
-        int local_x = p.x() - qrect.x();
-        int local_y = p.y() - qrect.y();
+        int local_x = p.x() - bounding.x();
+        int local_y = p.y() - bounding.y();
 
         if (
             local_x < 0 || local_y < 0 ||
-            local_x >= original_image.width() ||
-            local_y >= original_image.height()
+            local_x >= scrib_image.width() ||
+            local_y >= scrib_image.height()
             )
         {
             return false;
         }
 
-        QColor c = original_image.pixelColor(local_x, local_y);
+        QColor c = scrib_image.pixelColor(local_x, local_y);
 
         // Treat any visible pixel as part of the scribble
         return c.alpha() > 0;
@@ -106,11 +107,12 @@ class ScribbleContext : public QObject
 
     Q_OBJECT
 private:
+    QVector<ScribbleInfo> saved_scribbles;
+    QSize _size;
+    QImage combined_scribbles;
 
 public:
-    QVector<ScribbleInfo> saved_scribbles;
-    QSize size;
-    QImage combined_scribbles;
+
     std::vector<textoons_colorization_context::input_point> points;
 
 
@@ -121,13 +123,23 @@ public:
 
     //~ScribbleContext();
 
-    QImage colorize(const ScribbleInfo& scribble);
-    void storeSampledPoints(const std::vector<lz_colorization_context::input_point> sampled_points);
+    //const
+    const QSize size();
+    const QImage getScribblesAsImage();
+
+    QImage colorize(const QVector<ScribbleInfo>& scribbles);
+    QImage colorize(const QImage& scribbles_image);
+
+    void storeSampledPoints(const std::vector<lz_colorization_context::input_point>& sampled_points);
     void storeScribbles(const QVector<colorizer_scribble>& scribbles,
                                          const QSize m_size);
-    ScribbleInfo createScribblesFromQImage(QImage image, label_type label);
     void saveScribblesWithImageSize();
     void saveScribblesWithoutImageSize();
+
+    std::unordered_set<label_type> collectLabelsFromScribbles();
+
+    QVector<ScribbleInfo> extractScribblesFromQImage(const QImage& scribbles_image);
+    QImage createMaskByColor(const QRect& bounding, const QImage& original, const QColor& color);
 };
 
 //extern ScribbleContext scribble_context;

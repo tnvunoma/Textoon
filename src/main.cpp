@@ -30,8 +30,10 @@ int main(int argc, char *argv[])
     lazyb_window->show();
 
 
+
+
+
     /*
-    // colorize usage example:
 
     QVector<QImage> segmentation_images;
     QVector<ScribbleInfo> svd{scribble_context->saved_scribbles};
@@ -46,16 +48,29 @@ int main(int argc, char *argv[])
         }
     }
 
-    // even after transforming a scribble, you can still convert a QImage
-    // into a scribble by calling scribble_context->createScribblesFromQImage().
-    // it takes in the QImage and another argument, a label, which is a unique
-    // identifier for a scribble
 
-    // as long as you have that original scribble, you can access the label and use createScribblesFromQImage()
+        QVector<ScribbleInfo> scribbles{
+                                        scribble_context->extractScribblesFromQImage("saved_scribbles/combined_scribbles.png")};
+        QVector<QImage> segmentation_images;
+
+        for (const ScribbleInfo& scrib : scribbles){
+            // QDir().mkpath("saved_scribbles");
+
+            // QString filename = "saved_scribbles/scribble_" + QString::number(scrib.label()) + ".png";
+
+            // if (!scrib.scrib_image.save(filename)) {
+            //     std::cerr << "Failed to save scribble." << std::endl;
+            // }
+            segmentation_images.push_back(scribble_context->colorize(scrib));
+            QDir().mkpath("saved_scribbles");
+
+            QString filename = "saved_scribbles/segmentation_" + QString::number(scrib.label()) + ".png";
+
+            if (!segmentation_images.back().save(filename)) {
+                std::cerr << "Failed to save scribbles." << std::endl;
+            }
+        }
     */
-
-
-
 
     // MainWindow window = MainWindow(nullptr, scribble_context);
     // window.show();

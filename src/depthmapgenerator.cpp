@@ -20,17 +20,6 @@
 //     return false;
 // }
 
-
-// /*
-//  ScribbleInfo(int, int);
-//  SegmentInfo(int, int);
-
-//  map <int, scribbles>
-//  map <int, segments>
-
-//  colorize
-// */
-
 // void NormalMapGenerator::constructLaplacian(const unordered_set<int>& boundary_vals) {
 //     typedef Eigen::Triplet<double> T; // why is this double & not float again?
 
@@ -61,7 +50,7 @@
 //             ///     aka: if dp > dq
 //             ///
 //             //if (!boundary_vals.contains(i) && !boundary_vals.contains(j)){
-//             triplets.push_back(T(i, j, weight));
+//             triplets.push_back(T(i, j, -weight));
 //             //}
 //         }
 //     }
@@ -84,9 +73,9 @@
 
 //     MatrixXf x{solver.solve(MatrixXf::Zero(width*height, 3))};
 
-//     for (){
-//         x.row() = ;
-//     }
+//     //for (){
+//         //x.row() = ;
+//     //}
 
 //     if (belowOcclusion()){
 
@@ -108,7 +97,7 @@
 //     for (int x = 0; x < width; x++){
 //         for (int y = 0; y < height; y++){
 
-//             int index = x * width + y;
+//             int index = y * width + x;
 //             Vector3f normColor = (0.5*mat.row(index).normalized()).array()+0.5f;
 //             data[index] = qRgb(std::clamp(normColor.x(), 0.f, 1.f),
 //                                std::clamp(normColor.y(), 0.f, 1.f),

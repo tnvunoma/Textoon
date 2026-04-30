@@ -3,11 +3,12 @@
 #include <QPainter>
 #include <iostream>
 #include <QDir>
+#include <QString>
 #include "lazybrush/lazybrush_components/window.h"
 
 
 
-void ScribbleContext::storeSampledPoints(const std::vector<lz_colorization_context::input_point> sampled_points){
+void ScribbleContext::storeSampledPoints(const std::vector<lz_colorization_context::input_point>& sampled_points){
 
     std::transform(sampled_points.begin(),
                    sampled_points.end(),
@@ -18,6 +19,15 @@ void ScribbleContext::storeSampledPoints(const std::vector<lz_colorization_conte
                     }
                    );
 }
+
+const QSize ScribbleContext::size(){
+    return _size;
+}
+
+const QImage ScribbleContext::getScribblesAsImage(){
+    return combined_scribbles;
+}
+
 
 void ScribbleContext::storeScribbles(const QVector<colorizer_scribble>& scribbles,
                                      const QSize m_size)
@@ -32,7 +42,7 @@ void ScribbleContext::storeScribbles(const QVector<colorizer_scribble>& scribble
         saved_scribbles.push_back({s.image(), s.rect(), cs.label()});
     }
 
-    size = m_size;
+    _size = m_size;
 }
 
 void ScribbleContext::saveScribblesWithImageSize()
@@ -48,7 +58,7 @@ void ScribbleContext::saveScribblesWithImageSize()
     }
 
     // Create output image
-    QImage combined(size, QImage::Format_ARGB32);
+    QImage combined(_size, QImage::Format_ARGB32);
 
 
     combined.fill(Qt::transparent);
@@ -57,7 +67,7 @@ void ScribbleContext::saveScribblesWithImageSize()
 
     // Draw scribbles into image
     for (const ScribbleInfo& scrib : std::as_const(saved_scribbles)) {
-        painter.drawImage(scrib.qrect.topLeft(), scrib.original_image);
+        painter.drawImage(scrib.bounding.topLeft(), scrib.scrib_image);
     }
 
     painter.end();
@@ -90,7 +100,7 @@ void ScribbleContext::saveScribblesWithoutImageSize()
     QRect bounding;
 
     for (const ScribbleInfo& s : scribbles) {
-        bounding = bounding.united(s.qrect);
+        bounding = bounding.united(s.bounding);
     }
 
     QImage combined(bounding.size(), QImage::Format_ARGB32);
@@ -103,9 +113,9 @@ void ScribbleContext::saveScribblesWithoutImageSize()
     // Draw each scribble into the combined image
     for (const ScribbleInfo& s : scribbles) {
         // shift into local coordinates of the bounding box
-        QPoint topLeft = s.qrect.topLeft() - bounding.topLeft();
+        QPoint topLeft = s.bounding.topLeft() - bounding.topLeft();
 
-        painter.drawImage(topLeft, s.original_image);
+        painter.drawImage(topLeft, s.scrib_image);
     }
 
     painter.end();
@@ -127,46 +137,125 @@ QRect rect_type_to_QRect(rect_type const & rect)
     return QRect(rect.x(), rect.y(), rect.width(), rect.height());
 }
 
-QRect rectFromImage(const QImage& image)
-{
-    // create a rect that retains the original coordinates of the scribble within the image
-    QRect rect;
+/*
+segments also need to contain depth information - choose some arbitrary depth step
+*/
+// proxy colorize method
 
-    for (int y = 0; y < image.height(); y++) {
-        for (int x = 0; x < image.width(); x++) {
-            QColor p{image.pixelColor(x, y)};
-            if (p.alpha() > 0) {
-                rect = rect.isNull()
-                    ? QRect(x, y, 1, 1)
-                    : rect.united(QRect(x, y, 1, 1));
+QImage ScribbleContext::createMaskByColor(const QRect& bounding, const QImage& original, const QColor& color){
+
+    QImage mask(bounding.size(), QImage::Format_ARGB32);
+    mask.fill(Qt::transparent);
+
+    int b_height = bounding.height();
+    int b_width = bounding.width();
+    int tlx = bounding.topLeft().x();
+    int tly = bounding.topLeft().y();
+
+    QRgb* data{reinterpret_cast<QRgb*>(mask.bits())};
+    for (int x = tlx; x < tlx+b_width; x++){
+        for (int y = tly; y < tly+b_height; y++){
+            int nw_index = (y - tly) * b_width + (x - tlx);
+
+            QColor image_color(original.pixel(x, y));
+            if (color == image_color){
+                data[nw_index] = original.pixel(x, y);
             }
         }
     }
 
-
-    return rect;
+    return mask;
 }
 
-ScribbleInfo ScribbleContext::createScribblesFromQImage(QImage image, label_type label){
-    // for transformed scribbles - easily create a scribble in order to use the colorize function
-
-    QRect rect = rectFromImage(image);
-    return ScribbleInfo(image.copy(rect), rect, label);
+std::unordered_set<short> ScribbleContext::collectLabelsFromScribbles(){
+    std::unordered_set<label_type> labels;
+    for (const ScribbleInfo& scrib : std::as_const(saved_scribbles)){
+        labels.insert(scrib.label());
+    }
+    return labels;
 }
 
-// proxy colorize method
-QImage ScribbleContext::colorize(const ScribbleInfo& scribble){
+QVector<ScribbleInfo> ScribbleContext::extractScribblesFromQImage(const QImage& scribbles_image){
+    //QImage scribbles_image(QString::fromStdString(scribble_filepath));
+    QVector<ScribbleInfo> vec;
+
+    std::map<short, QRect> rect_map;
+
+
+    if (!scribbles_image.isNull()){
+
+        // Construct QRects (bounding boxes) based on labels (image color)
+
+        for (short label : collectLabelsFromScribbles()){
+            int height = scribbles_image.size().height();
+            int width = scribbles_image.size().width();
+
+            const QRgb* data{reinterpret_cast<QRgb*>(const_cast<uchar*>(scribbles_image.bits()))};
+
+
+            QColor target_color(
+                static_cast<unsigned char>(the_palette[label][0]),
+                static_cast<unsigned char>(the_palette[label][1]),
+                static_cast<unsigned char>(the_palette[label][2]));
+
+            for (int x = 0; x < width; x++){
+                for (int y = 0; y < height; y++){
+                    int index = y * width + x;
+
+                    QColor image_color(data[index]);
+
+                    if (image_color.alpha() > 0){
+                        if (image_color == target_color){
+                            if (rect_map.contains(label)){
+                                rect_map[label] = rect_map[label].united(QRect(x, y, 1, 1));
+                            } else {
+                                rect_map[label] = QRect(x, y, 1, 1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Once QRects are obtained, the exact scribbles can be constructed, and these can be
+        // added into the vector of scribbles and returned
+        for (auto& [label, rect] : rect_map){
+            QColor target_color(
+                static_cast<unsigned char>(the_palette[label][0]),
+                static_cast<unsigned char>(the_palette[label][1]),
+                static_cast<unsigned char>(the_palette[label][2]));
+
+            vec.push_back({createMaskByColor(rect, scribbles_image, target_color), rect, label});
+        }
+    } else {
+        std::cerr << "Scribble extraction error: Unable to open image file" << std::endl;
+    }
+    return vec;
+}
+
+
+
+QImage ScribbleContext::colorize(const QImage& scribbles_image){
+    return colorize(extractScribblesFromQImage(scribbles_image));
+}
+
+QImage ScribbleContext::colorize(const QVector<ScribbleInfo>& scribbles){
 
     textoons_colorization_context small_context(
         0,
         0,
-        size.width(),
-        size.height(),
+        _size.width(),
+        _size.height(),
         cell_size,
         points);
 
-    small_context.append_scribble(scribble);
-    QImage segmnt(size, QImage::Format_ARGB32);
+    /// TODO: Change colorize to work on a set of scribbles
+
+    for (const ScribbleInfo& scribble : scribbles){
+        small_context.append_scribble(scribble);
+    }
+
+    QImage segmnt(_size, QImage::Format_ARGB32);
     segmnt.fill(Qt::transparent);
 
     std::vector<std::pair<rect_type, label_type>> labeling =
@@ -194,14 +283,6 @@ QImage ScribbleContext::colorize(const ScribbleInfo& scribble){
             }
         }
     }
-
-    // QDir().mkpath("saved_scribbles");
-
-    // QString filename = "saved_scribbles/segmentation.png";
-
-    // if (!segmnt.save(filename)) {
-    //     std::cerr << "Failed to save scribbles." << std::endl;
-    // }
 
     return segmnt;
 }

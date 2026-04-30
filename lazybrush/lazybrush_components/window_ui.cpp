@@ -328,37 +328,19 @@ lzwindow::setup_ui_()
 }
 
 void lzwindow::onSaveScribblesClicked(){
-    if (scribble_context->size.isEmpty()){
+    if (scribble_context->size().isEmpty()){
         scribble_context->saveScribblesWithoutImageSize();
     } else {
         scribble_context->saveScribblesWithImageSize();
 
-        QVector<QImage> segmentation_images;
-        QVector<ScribbleInfo> svd{scribble_context->saved_scribbles};
-        for (const ScribbleInfo& scrib : svd){
-            segmentation_images.push_back(scribble_context->colorize(scrib));
-            QDir().mkpath("saved_scribbles");
+        QImage segmentation_image{scribble_context->colorize
+                                  (scribble_context->getScribblesAsImage())};
+        QDir().mkpath("saved_scribbles");
 
-            QString filename = "saved_scribbles/segmentation_" + QString::number(scrib.label()) + ".png";
+        QString filename = "saved_scribbles/segmentation_combined.png";
 
-            if (!segmentation_images.back().save(filename)) {
-                std::cerr << "Failed to save scribbles." << std::endl;
-            }
+        if (!segmentation_image.save(filename)) {
+            std::cerr << "Failed to save scribbles." << std::endl;
         }
-        // ScribbleInfo scrib{scribble_context->saved_scribbles.back()};
-
-        // scribble_context->colorize(scribble_context->saved_scribbles.back());
-
-        // QImage segmnt{scribble_context->colorize(scribble_context->saved_scribbles.back())};
-
-        // ScribbleInfo n_scrib{scribble_context->createScribblesFromQImage(scribble_context->combined_scribbles, scrib.label())};
-
-        // QDir().mkpath("saved_scribbles");
-
-        // QString filename = "saved_scribbles/segmentation.png";
-
-        // if (!segmnt.save(filename)) {
-        //     std::cerr << "Failed to save scribbles." << std::endl;
-        // }
     }
 }

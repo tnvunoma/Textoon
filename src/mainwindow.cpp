@@ -26,10 +26,9 @@ MainWindow::MainWindow(QWidget *parent, ScribbleContext* ctx)
 }
 
 void MainWindow::onSaveScribblesClicked(){
-    if (scribble_context->size.isEmpty()){
-        scribble_context->saveScribblesWithoutImageSize();
-    } else {
-        scribble_context->saveScribblesWithImageSize();
-        scribble_context->colorize(scribble_context->saved_scribbles.back());
-    }
+//     if (scribble_context->size().isEmpty()){
+//         scribble_context->saveScribblesWithoutImageSize();
+//     } else {
+//         scribble_context->saveScribblesWithImageSize();
+//     }
 }
