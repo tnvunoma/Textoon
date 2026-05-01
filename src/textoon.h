@@ -15,7 +15,7 @@ class Textoon
 public:
     Textoon(ScribbleContext* scribble_context) : scribbleContext(scribble_context) {};
 
-    void processFolder(const QString &inputFolder);
+    void processFolder(const QString &inputFolder, const QString &anim_name);
 
     struct UV {
         float u;
@@ -26,6 +26,7 @@ private:
     ScribbleContext* scribbleContext;
 
     QString outputFolder;
+    QString anim_nm;
 
     void processFrames(const QString &inputFolder);
 

@@ -13,19 +13,20 @@ int main(int argc, char *argv[])
 
     QStringList args = QCoreApplication::arguments();
 
-    if (args.size() < 2) {
-        qDebug() << "Usage: program <input_folder>";
+    if (args.size() < 3) {
+        qDebug() << "Usage: program <input_folder> <animation_name>";
         return -1;
     }
 
     QString inputFolder = args[1];
+    QString anim_name = args[2];
 
     ScribbleContext* scribble_context = new ScribbleContext(nullptr, inputFolder);
     Textoon* processor = new Textoon(scribble_context);
 
     QObject::connect(scribble_context, &ScribbleContext::scribblesUpdated,
-                     [processor, inputFolder]() {
-                        processor->processFolder(inputFolder);
+                     [processor, inputFolder, anim_name]() {
+                        processor->processFolder(inputFolder, anim_name);
                      });
 
     lzwindow* lazyb_window = new lzwindow(scribble_context);

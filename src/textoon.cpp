@@ -19,9 +19,10 @@ struct FrameState
     std::vector<std::vector<Textoon::UV>> uv;
 };
 
-void Textoon::processFolder(const QString &inputFolder)
+void Textoon::processFolder(const QString &inputFolder, const QString &anim_name)
 {
     outputFolder = inputFolder + "/output";
+    anim_nm = anim_name;
     QDir().mkpath(outputFolder);
 
     processFrames(inputFolder);
@@ -72,7 +73,11 @@ void Textoon::processFrames(const QString &inputFolder)
     QDir dir(inputFolder);
 
     QStringList filters;
-    filters << "*.png" << "*.jpg" << "*.bmp";
+    // ? - match this exactly
+    // so ???? = match exactly 4 chars
+    filters << anim_nm + "_????.png"
+            << anim_nm + "_????.jpg"
+            << anim_nm + "_????.bmp";
 
     QFileInfoList fileList = dir.entryInfoList(filters, QDir::Files, QDir::Name);
 
@@ -90,14 +95,13 @@ void Textoon::processFrames(const QString &inputFolder)
     // get lazybrush segmentation
     prev.segmentation = scribbleContext->colorize(prev.scribbles);
 
+    // QDir().mkpath(inputFolder + "/miscellanea");
 
-    QDir().mkpath(inputFolder + "/miscellanea");
+    // QString filename = inputFolder + "/miscellanea/segmentation.png";
 
-    QString filename = inputFolder + "/miscellanea/segmentation.png";
-
-    if (!prev.segmentation.save(filename)) {
-        std::cerr << "Failed to save seg." << std::endl;
-    }
+    // if (!prev.segmentation.save(filename)) {
+    //     std::cerr << "Failed to save seg." << std::endl;
+    // }
 
     // Initialize UV (identity)
     prev.uv = initUV(prev.image.width(), prev.image.height());
