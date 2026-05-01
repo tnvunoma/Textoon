@@ -38,18 +38,45 @@ public:
         // Initialize contour points
         std::vector<point_type> points;
 
-        for (int y = 0; y < scrib_image.height(); ++y)
+        if (!scrib_image.isNull())
         {
-            for (int x = 0; x < scrib_image.width(); ++x)
+            for (int y = 1; y < scrib_image.height() - 1; ++y)
             {
-                QColor c = scrib_image.pixelColor(x, y);
-
-                if (c.alpha() > 0)
+                const quint8 * pixel = scrib_image.scanLine(y);
+                for (int x = 0; x < scrib_image.width() - 1; ++x, pixel += 4)
                 {
-                    points.emplace_back(rect.x() + x, rect.y() + y);
+                    if (pixel[3] == 0)
+                    {
+                        continue;
+                    }
+
+                    if ((pixel - scrib_image.bytesPerLine() - 4)[3] == 0 ||
+                        (pixel - scrib_image.bytesPerLine() - 0)[3] == 0 ||
+                        (pixel - scrib_image.bytesPerLine() + 4)[3] == 0 ||
+                        (pixel - 4)[3] == 0 ||
+                        (pixel + 4)[3] == 0 ||
+                        (pixel + scrib_image.bytesPerLine() - 4)[3] == 0 ||
+                        (pixel + scrib_image.bytesPerLine() - 0)[3] == 0 ||
+                        (pixel + scrib_image.bytesPerLine() + 4)[3] == 0)
+                    {
+                        points.push_back(point_type(x + bounding.x(), y + bounding.y()));
+                    }
                 }
             }
         }
+
+        // for (int y = 0; y < scrib_image.height(); y++)
+        // {
+        //     for (int x = 0; x < scrib_image.width(); x++)
+        //     {
+        //         QColor c = scrib_image.pixelColor(x, y);
+
+        //         if (c.alpha() > 0)
+        //         {
+        //             points.emplace_back(rect.x() + x, rect.y() + y);
+        //         }
+        //     }
+        // }
     }
 
     rect_type rect() const {
@@ -59,6 +86,44 @@ public:
     std::vector<point_type> points;
 
     /// FOR THE COLORIZER
+    /*
+    scribble::contour_points() const
+    {
+        if (!cache_is_valid_)
+        {
+            cached_contour_points_.clear();
+
+            if (!image_.isNull())
+            {
+                for (int y = 1; y < image_.height() - 1; ++y)
+                {
+                    const quint8 * pixel = image_.scanLine(y);
+                    for (int x = 0; x < image_.width() - 1; ++x, pixel += 4)
+                    {
+                        if (pixel[3] == 0)
+                        {
+                            continue;
+                        }
+
+                        if ((pixel - image_.bytesPerLine() - 4)[3] == 0 ||
+                            (pixel - image_.bytesPerLine() - 0)[3] == 0 ||
+                            (pixel - image_.bytesPerLine() + 4)[3] == 0 ||
+                            (pixel - 4)[3] == 0 ||
+                            (pixel + 4)[3] == 0 ||
+                            (pixel + image_.bytesPerLine() - 4)[3] == 0 ||
+                            (pixel + image_.bytesPerLine() - 0)[3] == 0 ||
+                            (pixel + image_.bytesPerLine() + 4)[3] == 0)
+                        {
+                            points.push_back(point_type(x + image_rect_.x(), y + image_rect_.y()));
+                        }
+                    }
+                }
+            }
+
+            cache_is_valid_ = true;
+        }
+        return cached_contour_points_;
+    }*/
 
     bool contains_point(point_type const& p) const
     {
@@ -136,7 +201,8 @@ public:
     void saveScribblesWithImageSize();
     void saveScribblesWithoutImageSize();
 
-    std::unordered_set<label_type> collectLabelsFromScribbles();
+    std::unordered_set<short> collectLabelsFromScribbles();
+    std::map<QRgb, short> generateColorToLabelMap();
 
     QVector<ScribbleInfo> extractScribblesFromQImage(const QImage& scribbles_image);
     QImage createMaskByColor(const QRect& bounding, const QImage& original, const QColor& color);

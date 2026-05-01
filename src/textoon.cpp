@@ -87,7 +87,7 @@ void Textoon::processFrames(const QString &inputFolder)
     prev.scribbles = loadInitialScribbles(inputFolder);
 
     // get lazybrush segmentation
-    prev.segmentation = scribbleContext.imgColorize(prev.scribbles);
+    //prev.segmentation = scribbleContext.imgColorize(prev.scribbles);
 
 
     // Initialize UV (identity)
@@ -116,7 +116,7 @@ void Textoon::processFrames(const QString &inputFolder)
         curr.scribbles = warpImage(prev.scribbles, W);
 
         // LazyBrush segmentation
-        curr.segmentation = scribbleContext.imgColorize(curr.scribbles);
+        //curr.segmentation = scribbleContext.imgColorize(curr.scribbles);
 
         // extract regions
         auto regions = extractRegions(curr.segmentation);

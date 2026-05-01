@@ -168,49 +168,56 @@ QImage ScribbleContext::createMaskByColor(const QRect& bounding, const QImage& o
 }
 
 std::unordered_set<short> ScribbleContext::collectLabelsFromScribbles(){
-    std::unordered_set<label_type> labels;
+    std::unordered_set<short> labels;
     for (const ScribbleInfo& scrib : std::as_const(saved_scribbles)){
         labels.insert(scrib.label());
     }
     return labels;
 }
 
+std::map<QRgb, short> ScribbleContext::generateColorToLabelMap(){
+    // generate a map from labels
+    std::map<QRgb, short> map;
+    for (const ScribbleInfo& scrib : std::as_const(saved_scribbles)){
+        short label = scrib.label();
+        QColor color(
+            static_cast<unsigned char>(the_palette[label][0]),
+            static_cast<unsigned char>(the_palette[label][1]),
+            static_cast<unsigned char>(the_palette[label][2]));
+        map[color.rgba()] = label;
+    }
+    return map;
+}
+
 QVector<ScribbleInfo> ScribbleContext::extractScribblesFromQImage(const QImage& scribbles_image){
-    //QImage scribbles_image(QString::fromStdString(scribble_filepath));
+    // Extracts scribbles from the image. The scribbles extracted will only be the ones whose labels match
+    // current UI elements
+
     QVector<ScribbleInfo> vec;
 
     std::map<short, QRect> rect_map;
-
+    std::map<QRgb, short> colors_to_labels{generateColorToLabelMap()};
 
     if (!scribbles_image.isNull()){
 
         // Construct QRects (bounding boxes) based on labels (image color)
 
-        for (short label : collectLabelsFromScribbles()){
-            int height = scribbles_image.size().height();
-            int width = scribbles_image.size().width();
+        int height = scribbles_image.height();
+        int width = scribbles_image.width();
 
-            const QRgb* data{reinterpret_cast<QRgb*>(const_cast<uchar*>(scribbles_image.bits()))};
-
-
-            QColor target_color(
-                static_cast<unsigned char>(the_palette[label][0]),
-                static_cast<unsigned char>(the_palette[label][1]),
-                static_cast<unsigned char>(the_palette[label][2]));
+        for (int y = 0; y < height; y++){
+            const QRgb* line = reinterpret_cast<const QRgb*>(scribbles_image.scanLine(y));
 
             for (int x = 0; x < width; x++){
-                for (int y = 0; y < height; y++){
-                    int index = y * width + x;
-
-                    QColor image_color(data[index]);
-
-                    if (image_color.alpha() > 0){
-                        if (image_color == target_color){
-                            if (rect_map.contains(label)){
-                                rect_map[label] = rect_map[label].united(QRect(x, y, 1, 1));
-                            } else {
-                                rect_map[label] = QRect(x, y, 1, 1);
-                            }
+                QRgb px_color = line[x];
+                if (qAlpha(px_color) > 0){
+                    auto it = colors_to_labels.find(px_color);
+                    if (it != colors_to_labels.end()){
+                        short label = it->second;
+                        if (rect_map.contains(label)){
+                            rect_map[label] = rect_map[label].united(QRect(x, y, 1, 1));
+                        } else {
+                            rect_map[label] = QRect(x, y, 1, 1);
                         }
                     }
                 }
@@ -228,7 +235,7 @@ QVector<ScribbleInfo> ScribbleContext::extractScribblesFromQImage(const QImage& 
             vec.push_back({createMaskByColor(rect, scribbles_image, target_color), rect, label});
         }
     } else {
-        std::cerr << "Scribble extraction error: Unable to open image file" << std::endl;
+        std::cerr << "Scribble extraction error: Unable to open image" << std::endl;
     }
     return vec;
 }
@@ -236,6 +243,23 @@ QVector<ScribbleInfo> ScribbleContext::extractScribblesFromQImage(const QImage& 
 
 
 QImage ScribbleContext::colorize(const QImage& scribbles_image){
+    /*
+     * Converts an image containing scribbles to an image containing the segmentation of said scribbles.
+     *
+     * the internal colorizer needs images to be in the form of scribbles.
+     * As far as it is concerned, a scribble is simply defined as an image that
+     *      a, knows its location within a larger image (can return a bounding box of rect_type),
+     *      b, knows its unique labeling to differentiate itself from other scribbles (can return a label_type),
+     *      c, knows the
+     *
+     * The class ScribbleInfo is "our" scribble for the Textoons pipeline, but you'll notice internally that there are
+     * different types of scribbles. This is because the internal colorize is meant to be generic, but hopefully you
+     * won't need to interact with them thanks to this class.
+     *
+     * IMPORTANT!!: Note that scribble extraction has the current UI scribbles as a dependency
+     * so that it can correctly retrieve the labels. As such, if you haven't saved scribbles in the UI before using it,
+     * colorize will not work.
+    */
     return colorize(extractScribblesFromQImage(scribbles_image));
 }
 
@@ -249,8 +273,6 @@ QImage ScribbleContext::colorize(const QVector<ScribbleInfo>& scribbles){
         cell_size,
         points);
 
-    /// TODO: Change colorize to work on a set of scribbles
-
     for (const ScribbleInfo& scribble : scribbles){
         small_context.append_scribble(scribble);
     }
@@ -263,7 +285,6 @@ QImage ScribbleContext::colorize(const QVector<ScribbleInfo>& scribbles){
 
     QPainter painter(&segmnt);
 
-    //grid_type const & working_grid = small_context.working_grid();
     for (auto const & node : labeling)
     {
         if (node.second != textoons_colorization_context::label_undefined &&
