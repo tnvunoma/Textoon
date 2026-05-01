@@ -11,8 +11,9 @@ using namespace Eigen;
 
 class Textoon
 {
+
 public:
-    Textoon();
+    Textoon(ScribbleContext* scribble_context) : scribbleContext(scribble_context) {};
 
     void processFolder(const QString &inputFolder);
 
@@ -22,7 +23,7 @@ public:
     };
 
 private:
-    ScribbleContext scribbleContext;
+    ScribbleContext* scribbleContext;
 
     QString outputFolder;
 

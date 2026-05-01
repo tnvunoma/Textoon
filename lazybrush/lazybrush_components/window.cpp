@@ -381,7 +381,7 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
                 //if (scribble_context)
                 //{
                 QVector<colorizer_scribble> colorizedScribbles(colorization_context_.scribbles().begin(),colorization_context_.scribbles().end());
-                    scribble_context->storeScribbles(colorizedScribbles,
+                    scribble_context->updateScribbles(colorizedScribbles,
                                                  original_image_.size());
 
                 //}
@@ -450,7 +450,7 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
             colorization_context_.append_scribble(colorizer_scribble(scribbles_.back(), selected_color_index_));
             //if (!original_image_.isNull()){
             QVector<colorizer_scribble> colorizedScribbles(colorization_context_.scribbles().begin(),colorization_context_.scribbles().end());
-            scribble_context->storeScribbles(colorizedScribbles,
+            scribble_context->updateScribbles(colorizedScribbles,
                                              original_image_.size());            // } else {
             //     scribble_context->storeScribbles(scribbles_);
             // }

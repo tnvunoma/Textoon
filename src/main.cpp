@@ -20,17 +20,16 @@ int main(int argc, char *argv[])
 
     QString inputFolder = args[1];
 
+    ScribbleContext* scribble_context = new ScribbleContext(nullptr, inputFolder);
+    Textoon* processor = new Textoon(scribble_context);
 
-    ScribbleContext* scribble_context = new ScribbleContext();
-
-    Textoon processor;
-    processor.processFolder(inputFolder);
+    QObject::connect(scribble_context, &ScribbleContext::scribblesUpdated,
+                     [processor, inputFolder]() {
+                        processor->processFolder(inputFolder);
+                     });
 
     lzwindow* lazyb_window = new lzwindow(scribble_context);
     lazyb_window->show();
-
-
-
 
 
     /*

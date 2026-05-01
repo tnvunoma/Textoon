@@ -9,10 +9,7 @@
 #include <QPoint>
 #include <fstream>
 #include "scribblecontext.h"
-
-Textoon::Textoon()
-{
-}
+#include <iostream>
 
 struct FrameState
 {
@@ -47,6 +44,10 @@ static std::vector<std::vector<int>> loadCsv(const std::string &path)
 {
     std::vector<std::vector<int>> data;
     std::ifstream f(path);
+    if (!f.is_open()) {
+        std::cerr << "Failed to load csv file: " + path + ". You need this to run the pipeline!" << std::endl;
+        return {};
+    }
     std::string line;
     while (std::getline(f, line))
     {
@@ -87,8 +88,16 @@ void Textoon::processFrames(const QString &inputFolder)
     prev.scribbles = loadInitialScribbles(inputFolder);
 
     // get lazybrush segmentation
-    //prev.segmentation = scribbleContext.imgColorize(prev.scribbles);
+    prev.segmentation = scribbleContext->colorize(prev.scribbles);
 
+
+    QDir().mkpath(inputFolder + "/miscellanea");
+
+    QString filename = inputFolder + "/miscellanea/segmentation.png";
+
+    if (!prev.segmentation.save(filename)) {
+        std::cerr << "Failed to save seg." << std::endl;
+    }
 
     // Initialize UV (identity)
     prev.uv = initUV(prev.image.width(), prev.image.height());
@@ -107,8 +116,11 @@ void Textoon::processFrames(const QString &inputFolder)
         curr.image = QImage(fileList[i].absoluteFilePath());
 
         // Load ARAP map
-        auto map_x = loadCsv("map_x_" + std::to_string(i) + ".csv");
-        auto map_y = loadCsv("map_y_" + std::to_string(i) + ".csv");
+        auto map_x = loadCsv(inputFolder.toStdString() + "/map_x_" + std::to_string(i) + ".csv");
+        auto map_y = loadCsv(inputFolder.toStdString() + "/map_y_" + std::to_string(i) + ".csv");
+        if (map_x.empty() || map_y.empty()){
+            continue;
+        }
 
         auto W = buildMap(map_x, map_y);
 
@@ -116,7 +128,7 @@ void Textoon::processFrames(const QString &inputFolder)
         curr.scribbles = warpImage(prev.scribbles, W);
 
         // LazyBrush segmentation
-        //curr.segmentation = scribbleContext.imgColorize(curr.scribbles);
+        curr.segmentation = scribbleContext->colorize(curr.scribbles);
 
         // extract regions
         auto regions = extractRegions(curr.segmentation);

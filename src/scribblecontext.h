@@ -25,6 +25,7 @@ public:
     QRect bounding;
     label_type _label{-1};
         // label for identification - this is how you id unique scribbles
+        // in our case, labels are indices to palette colors
 
     /// FOR US
     ScribbleInfo();
@@ -64,66 +65,15 @@ public:
                 }
             }
         }
-
-        // for (int y = 0; y < scrib_image.height(); y++)
-        // {
-        //     for (int x = 0; x < scrib_image.width(); x++)
-        //     {
-        //         QColor c = scrib_image.pixelColor(x, y);
-
-        //         if (c.alpha() > 0)
-        //         {
-        //             points.emplace_back(rect.x() + x, rect.y() + y);
-        //         }
-        //     }
-        // }
     }
+
+    /// FOR THE COLORIZER
 
     rect_type rect() const {
         return rect_type(bounding.x(), bounding.y(), bounding.width(), bounding.height());
     }
 
     std::vector<point_type> points;
-
-    /// FOR THE COLORIZER
-    /*
-    scribble::contour_points() const
-    {
-        if (!cache_is_valid_)
-        {
-            cached_contour_points_.clear();
-
-            if (!image_.isNull())
-            {
-                for (int y = 1; y < image_.height() - 1; ++y)
-                {
-                    const quint8 * pixel = image_.scanLine(y);
-                    for (int x = 0; x < image_.width() - 1; ++x, pixel += 4)
-                    {
-                        if (pixel[3] == 0)
-                        {
-                            continue;
-                        }
-
-                        if ((pixel - image_.bytesPerLine() - 4)[3] == 0 ||
-                            (pixel - image_.bytesPerLine() - 0)[3] == 0 ||
-                            (pixel - image_.bytesPerLine() + 4)[3] == 0 ||
-                            (pixel - 4)[3] == 0 ||
-                            (pixel + 4)[3] == 0 ||
-                            (pixel + image_.bytesPerLine() - 4)[3] == 0 ||
-                            (pixel + image_.bytesPerLine() - 0)[3] == 0 ||
-                            (pixel + image_.bytesPerLine() + 4)[3] == 0)
-                        {
-                            points.push_back(point_type(x + image_rect_.x(), y + image_rect_.y()));
-                        }
-                    }
-                }
-            }
-
-            cache_is_valid_ = true;
-        }
-        return cached_contour_points_;
-    }*/
 
     bool contains_point(point_type const& p) const
     {
@@ -175,20 +125,21 @@ private:
     QVector<ScribbleInfo> saved_scribbles;
     QSize _size;
     QImage combined_scribbles;
+    QString inputFolder;
 
 public:
+    //bool updated;
 
     std::vector<textoons_colorization_context::input_point> points;
 
-
-    explicit ScribbleContext(QObject* parent = nullptr)
-        : QObject(parent)
+    explicit ScribbleContext(QObject* parent = nullptr, const QString &inputFolder = nullptr)
+        : QObject(parent),
+        inputFolder(inputFolder)
     {
     }
 
     //~ScribbleContext();
 
-    //const
     const QSize size();
     const QImage getScribblesAsImage();
 
@@ -196,7 +147,7 @@ public:
     QImage colorize(const QImage& scribbles_image);
 
     void storeSampledPoints(const std::vector<lz_colorization_context::input_point>& sampled_points);
-    void storeScribbles(const QVector<colorizer_scribble>& scribbles,
+    void updateScribbles(const QVector<colorizer_scribble>& scribbles,
                                          const QSize m_size);
     void saveScribblesWithImageSize();
     void saveScribblesWithoutImageSize();
@@ -206,7 +157,7 @@ public:
 
     QVector<ScribbleInfo> extractScribblesFromQImage(const QImage& scribbles_image);
     QImage createMaskByColor(const QRect& bounding, const QImage& original, const QColor& color);
+
+signals:
+    void scribblesUpdated();
 };
-
-//extern ScribbleContext scribble_context;
-

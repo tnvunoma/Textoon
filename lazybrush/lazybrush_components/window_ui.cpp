@@ -333,14 +333,14 @@ void lzwindow::onSaveScribblesClicked(){
     } else {
         scribble_context->saveScribblesWithImageSize();
 
-        QImage segmentation_image{scribble_context->colorize
-                                  (scribble_context->getScribblesAsImage())};
-        QDir().mkpath("saved_scribbles");
+        // QImage segmentation_image{scribble_context->colorize
+        //                           (scribble_context->getScribblesAsImage())};
+        // QDir().mkpath("saved_scribbles");
 
-        QString filename = "saved_scribbles/segmentation_combined.png";
+        // QString filename = "saved_scribbles/segmentation_combined.png";
 
-        if (!segmentation_image.save(filename)) {
-            std::cerr << "Failed to save scribbles." << std::endl;
-        }
+        // if (!segmentation_image.save(filename)) {
+        //     std::cerr << "Failed to save scribbles." << std::endl;
+        // }
     }
 }
