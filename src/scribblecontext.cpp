@@ -5,8 +5,39 @@
 #include <QDir>
 #include <QString>
 #include "lazybrush/lazybrush_components/window.h"
+#include "lazybrush/lazybrush_include/preprocessing/threshold.hpp"
+#include "../lazybrush/lazybrush_include/preprocessing/skeleton.hpp"
 
+using textoons_colorization_context = lazybrush::grid_of_quadtrees_colorizer::colorization_context<ScribbleInfo>;
 
+std::vector<textoons_colorization_context::input_point>
+ScribbleContext::processPoints(const QImage& original_image_){
+    QImage grayscale_image = original_image_.convertToFormat(QImage::Format_Grayscale8);
+
+    QImage preprocessed_image_ =
+        preprocessing::skeleton_chen_hsu(preprocessing::threshold(grayscale_image, 192));
+
+    std::vector<textoons_colorization_context::input_point> image_points;
+    for (int y = 0; y < preprocessed_image_.height(); ++y)
+    {
+        quint8 * current_pixel = static_cast<quint8*>(preprocessed_image_.scanLine(y));
+        for (int x = 0; x < preprocessed_image_.width(); ++x, ++current_pixel)
+        {
+            if (*current_pixel == 0)
+            {
+                image_points.push_back
+                    (
+                        textoons_colorization_context::input_point
+                        {
+                            point_type(x, y),
+                            textoons_colorization_context::intensity_min
+                        }
+                    );
+            }
+        }
+    }
+    return image_points;
+}
 
 void ScribbleContext::storeSampledPoints(const std::vector<lz_colorization_context::input_point>& sampled_points){
 
@@ -254,7 +285,7 @@ QVector<ScribbleInfo> ScribbleContext::extractScribblesFromQImage(const QImage& 
     return vec;
 }
 
-QImage ScribbleContext::colorize(const QImage& scribbles_image){
+QImage ScribbleContext::colorize(const QImage& scribbles_image, const QImage& frame){
     /*
      * Converts an image containing scribbles to an image containing the segmentation of said scribbles.
      *
@@ -276,22 +307,22 @@ QImage ScribbleContext::colorize(const QImage& scribbles_image){
     */
     QVector<ScribbleInfo> scribbles{extractScribblesFromQImage(scribbles_image)};
     if (!scribbles.isEmpty()){
-        return colorize(scribbles);
+        return colorize(scribbles, frame);
     } else {
         std::cerr << "Colorize error: unable to create segmentation image." << std::endl;
         return QImage();
     }
 }
 
-QImage ScribbleContext::colorize(const QVector<ScribbleInfo>& scribbles){
-    // Proxy colorize around the internal colorizer
+QImage ScribbleContext::colorize(const QVector<ScribbleInfo>& scribbles, const QImage& frame){
+    // Proxy colorize around the internal colorizer    
     textoons_colorization_context small_context(
         0,
         0,
         _size.width(),
         _size.height(),
         cell_size,
-        points);
+        processPoints(frame));
 
     for (const ScribbleInfo& scribble : scribbles){
         small_context.append_scribble(scribble);

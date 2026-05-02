@@ -143,10 +143,13 @@ public:
     const QSize size();
     const QImage getScribblesAsImage();
 
-    QImage colorize(const QVector<ScribbleInfo>& scribbles);
-    QImage colorize(const QImage& scribbles_image);
+    QImage colorize(const QVector<ScribbleInfo>& scribbles, const QImage& frame);
+    QImage colorize(const QImage& scribbles_image, const QImage& frame);
 
     void storeSampledPoints(const std::vector<lz_colorization_context::input_point>& sampled_points);
+
+    std::vector<textoons_colorization_context::input_point>
+    processPoints(const QImage& original_image_);
     void updateScribbles(const QVector<colorizer_scribble>& scribbles,
                                          const QSize m_size);
     void saveScribblesWithImageSize();
