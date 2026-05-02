@@ -83,31 +83,56 @@ void Textoon::processFrames(const QString &inputFolder)
 
     if (fileList.isEmpty()) return;
 
+    // Load textures from texture/ subfolder
+    QDir texDir(inputFolder + "/texture");
+    QStringList texFilters;
+    texFilters << "*.png" << "*.jpg" << "*.bmp";
+    QFileInfoList texFiles = texDir.entryInfoList(texFilters, QDir::Files, QDir::Name);
+
+    // Map from color region -> texture image
+    // textures are named by their seg color hex e.g. ff0000.png and must be same size as frame
+    QMap<QRgb, QImage> textureMap;
+    for (const QFileInfo& f : texFiles)
+    {
+        bool ok = false;
+        QRgb color = f.baseName().toUInt(&ok, 16);
+        if (ok)
+        {
+            QImage tex(f.absoluteFilePath());
+            if (!tex.isNull())
+                textureMap[color] = tex.convertToFormat(QImage::Format_RGB32);
+        }
+    }
+
     // -------------------------------------
     // initialize reference frame
     // -------------------------------------
     FrameState prev;
 
+    QImage rawLine0  = QImage(fileList[0].absoluteFilePath());
     prev.image = QImage(fileList[0].absoluteFilePath());
 
+    QString debugDir = inputFolder + "/miscellanea";
+    QDir().mkpath(debugDir);
+
     prev.scribbles = loadInitialScribbles(inputFolder);
+    prev.scribbles.save(debugDir + "/scribbles_0000.png");
 
     // get lazybrush segmentation
     prev.segmentation = scribbleContext->colorize(prev.scribbles);
-
-    // QDir().mkpath(inputFolder + "/miscellanea");
-
-    // QString filename = inputFolder + "/miscellanea/segmentation.png";
-
-    // if (!prev.segmentation.save(filename)) {
-    //     std::cerr << "Failed to save seg." << std::endl;
-    // }
+    prev.segmentation.save(debugDir + "/segmentation_0000.png");
+    auto region0 = extractRegions(prev.segmentation);
 
     // Initialize UV (identity)
     prev.uv = initUV(prev.image.width(), prev.image.height());
 
+    // color with segmentation colors
+    prev.image = applySegmentationColors(rawLine0, prev.segmentation);
+
     // Render F0
-    QImage rendered0 = render(prev.image, prev.uv);
+    QImage rendered0 = textureMap.isEmpty()
+                           ? prev.image
+                           : textureInitFrame(rawLine0, prev.image, region0, textureMap);
     rendered0.save(outputFolder + "/frame_0000.png");
 
     // -------------------------------------
@@ -117,7 +142,9 @@ void Textoon::processFrames(const QString &inputFolder)
     {
         FrameState curr;
 
+        QImage rawLine = QImage(fileList[i].absoluteFilePath());
         curr.image = QImage(fileList[i].absoluteFilePath());
+        QString frameId = QString("%1").arg(i, 4, 10, QChar('0'));
 
         // Load ARAP map
         auto map_x = loadCsv(inputFolder.toStdString() + "/map_x_" + std::to_string(i) + ".csv");
@@ -130,18 +157,23 @@ void Textoon::processFrames(const QString &inputFolder)
 
         // Transfer scribbles
         curr.scribbles = warpImage(prev.scribbles, W);
+        curr.scribbles.save(debugDir + "/scribbles_" + frameId + ".png");
 
         // LazyBrush segmentation
         curr.segmentation = scribbleContext->colorize(curr.scribbles);
-
-        // extract regions
+        curr.segmentation.save(debugDir + "/segmentation_" + frameId + ".png");
         auto regions = extractRegions(curr.segmentation);
+
+        // color with segmentation colors
+        curr.image = applySegmentationColors(rawLine, curr.segmentation);
 
         // UV transfer
         curr.uv = transferUV(prev.uv, W, regions);
 
         // Render
-        QImage rendered = render(curr.image, curr.uv);
+        QImage rendered = textureMap.isEmpty()
+                              ? curr.image
+                              : render(rawLine, curr.image, curr.uv, regions, textureMap);
 
         QString out = outputFolder + QString("/frame_%1.png").arg(i, 4, 10, QChar('0'));
         rendered.save(out);
@@ -162,6 +194,42 @@ std::vector<std::vector<Textoon::UV>> Textoon::initUV(int w, int h)
             T[y][x] = { float(x) / w, float(y) / h };
 
     return T;
+}
+
+QImage Textoon::textureInitFrame(
+    const QImage&                              lineArt,
+    const QImage&                              coloredLineArt,
+    const std::map<QRgb, std::vector<QPoint>>& regions,
+    const QMap<QRgb, QImage>&                  textureMap)
+{
+    QImage out  = coloredLineArt.convertToFormat(QImage::Format_RGB32);
+    QImage line = lineArt.convertToFormat(QImage::Format_RGB32);
+
+    for (const auto& [color, pixels] : regions)
+    {
+        if (!textureMap.contains(color))
+            continue;
+
+        const QImage& tex = textureMap[color];
+
+        for (const QPoint& p : pixels)
+        {
+            int x = p.x();
+            int y = p.y();
+
+            // texture pixel directly maps to frame pixel
+            QRgb texPx  = reinterpret_cast<const QRgb*>(tex.scanLine(y))[x];
+            QRgb linePx = reinterpret_cast<const QRgb*>(line.scanLine(y))[x];
+
+            int r = (qRed(linePx)   * qRed(texPx))   / 255;
+            int g = (qGreen(linePx) * qGreen(texPx)) / 255;
+            int b = (qBlue(linePx)  * qBlue(texPx))  / 255;
+
+            reinterpret_cast<QRgb*>(out.scanLine(y))[x] = qRgb(r, g, b);
+        }
+    }
+
+    return out;
 }
 
 std::vector<std::vector<QPointF>>
@@ -378,6 +446,49 @@ QImage Textoon::warpImage(
     return dst;
 }
 
+QImage Textoon::applySegmentationColors(
+    const QImage& lineArt,
+    const QImage& segmentation)
+{
+    int w = lineArt.width();
+    int h = lineArt.height();
+    QImage out(w, h, QImage::Format_ARGB32);
+
+    QImage line = lineArt.convertToFormat(QImage::Format_ARGB32);
+    QImage seg  = segmentation.convertToFormat(QImage::Format_ARGB32);
+
+    for (int y = 0; y < h; ++y)
+    {
+        const QRgb* lineRow = (const QRgb*)line.scanLine(y);
+        const QRgb* segRow  = (const QRgb*)seg.scanLine(y);
+        QRgb*       outRow  = (QRgb*)out.scanLine(y);
+
+        for (int x = 0; x < w; ++x)
+        {
+            QRgb linePx = lineRow[x];
+            QRgb segPx  = segRow[x];
+
+            bool hasSeg = qAlpha(segPx) > 10;
+
+            if (!hasSeg)
+            {
+                // No seg region, just show base lineart img
+                outRow[x] = linePx;
+            }
+            else
+            {
+                // Multiply blend
+                int r = (qRed(linePx)   * qRed(segPx))   / 255;
+                int g = (qGreen(linePx) * qGreen(segPx)) / 255;
+                int b = (qBlue(linePx)  * qBlue(segPx))  / 255;
+
+                outRow[x] = qRgba(r, g, b, 255);
+            }
+        }
+    }
+    return out;
+}
+
 std::vector<std::vector<Textoon::UV>>
 Textoon::transferUV(
     const std::vector<std::vector<UV>>& prevUV,
@@ -496,30 +607,45 @@ Textoon::transferUV(
 }
 
 QImage Textoon::render(
-    const QImage& sourceTexture,
-    const std::vector<std::vector<UV>>& T)
+    const QImage&                              lineArt,
+    const QImage&                              coloredLineArt,  // output of applySegmentationColors
+    const std::vector<std::vector<UV>>&        T,
+    const std::map<QRgb, std::vector<QPoint>>& regions,
+    const QMap<QRgb, QImage>&                  textureMap)
 {
-    int w = sourceTexture.width();
-    int h = sourceTexture.height();
+    int w = lineArt.width();
+    int h = lineArt.height();
 
-    QImage src = sourceTexture.convertToFormat(QImage::Format_RGB32);
+    QImage out  = coloredLineArt.convertToFormat(QImage::Format_RGB32);
+    QImage line = lineArt.convertToFormat(QImage::Format_RGB32);
 
-    QImage out(w, h, QImage::Format_RGB32);
-
-    for (int y = 0; y < h; ++y)
+    for (const auto& [color, pixels] : regions)
     {
-        QRgb* outLine = reinterpret_cast<QRgb*>(out.scanLine(y));
+        if (!textureMap.contains(color))
+            continue; // no texture for this region, flat color stays
 
-        for (int x = 0; x < w; ++x)
+        const QImage& tex = textureMap[color]; // same size as frame, Format_RGB32
+
+        for (const QPoint& p : pixels)
         {
+            int x = p.x();
+            int y = p.y();
+
             float u = std::clamp(T[y][x].u, 0.f, 1.f);
             float v = std::clamp(T[y][x].v, 0.f, 1.f);
 
-            int sx = int(u * (w - 1));
-            int sy = int(v * (h - 1));
+            int tx = int(u * (tex.width()  - 1));
+            int ty = int(v * (tex.height() - 1));
 
-            const QRgb* srcLine = reinterpret_cast<const QRgb*>(src.scanLine(sy));
-            outLine[x] = srcLine[sx];
+            QRgb texPx  = reinterpret_cast<const QRgb*>(tex.scanLine(ty))[tx];
+            QRgb linePx = reinterpret_cast<const QRgb*>(line.scanLine(y))[x];
+
+            // Multiply: texture color under lineart, lines darken through
+            int r = (qRed(linePx)   * qRed(texPx))   / 255;
+            int g = (qGreen(linePx) * qGreen(texPx)) / 255;
+            int b = (qBlue(linePx)  * qBlue(texPx))  / 255;
+
+            reinterpret_cast<QRgb*>(out.scanLine(y))[x] = qRgb(r, g, b);
         }
     }
 

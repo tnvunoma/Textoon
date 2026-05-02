@@ -34,6 +34,12 @@ private:
 
     std::vector<std::vector<Textoon::UV>> initUV(int w, int h);
 
+    QImage textureInitFrame(
+        const QImage&                              lineArt,
+        const QImage&                              coloredLineArt,
+        const std::map<QRgb, std::vector<QPoint>>& regions,
+        const QMap<QRgb, QImage>&                  textureMap);
+
     std::vector<std::vector<QPointF>> buildMap(
         const std::vector<std::vector<int>>& map_x,
         const std::vector<std::vector<int>>& map_y);
@@ -44,14 +50,21 @@ private:
         const QImage& src,
         const std::vector<std::vector<QPointF>>& W12);
 
+    QImage applySegmentationColors(
+        const QImage& lineArt,
+        const QImage& segmentation);
+
     std::vector<std::vector<Textoon::UV>> transferUV(
         const std::vector<std::vector<UV>>& prevUV,
         const std::vector<std::vector<QPointF>>& W12,
         const std::map<QRgb, std::vector<QPoint>>& regions);
 
     QImage render(
-        const QImage& sourceTexture,
-        const std::vector<std::vector<UV>>& T);
+        const QImage&                              lineArt,
+        const QImage&                              coloredLineArt,
+        const std::vector<std::vector<UV>>&        T,
+        const std::map<QRgb, std::vector<QPoint>>& regions,
+        const QMap<QRgb, QImage>&                  textureMap);
 };
 
 
