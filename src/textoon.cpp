@@ -119,7 +119,7 @@ void Textoon::processFrames(const QString &inputFolder)
     prev.scribbles.save(debugDir + "/scribbles_0000.png");
 
     // get lazybrush segmentation
-    prev.segmentation = scribbleContext->colorize(prev.scribbles);
+    prev.segmentation = scribbleContext->colorize(prev.scribbles, prev.image);
     prev.segmentation.save(debugDir + "/segmentation_0000.png");
     auto region0 = extractRegions(prev.segmentation);
 
@@ -160,7 +160,7 @@ void Textoon::processFrames(const QString &inputFolder)
         curr.scribbles.save(debugDir + "/scribbles_" + frameId + ".png");
 
         // LazyBrush segmentation
-        curr.segmentation = scribbleContext->colorize(curr.scribbles);
+        curr.segmentation = scribbleContext->colorize(curr.scribbles, curr.image);
         curr.segmentation.save(debugDir + "/segmentation_" + frameId + ".png");
         auto regions = extractRegions(curr.segmentation);
 

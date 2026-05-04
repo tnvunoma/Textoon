@@ -180,18 +180,19 @@ class Lattice:
         return np.stack([new_xy[..., 1], new_xy[..., 0]], axis=-1)
 
 
-source = plt.imread("dummy_data/arap_test/small_walk_0000.png")[:, :, :3]
-target = plt.imread("dummy_data/arap_test/small_walk_0002.png")[:, :, :3]
+for i in range(5):
+    source = plt.imread(f"dummy_data/walk1/small_walk_{(i*2):04}.png")[:, :, :3]
+    target = plt.imread(f"dummy_data/walk1/small_walk_{(i*2+2):04}.png")[:, :, :3]
 
-grid_size = 20
-M = 40
-iters = 20
+    grid_size = 20
+    M = 40
+    iters = 20
 
-test = Lattice(source, target, grid_size)
-test.fit(grid_size, M, iters)
-corr = test.correspondence_map()
-map_y = np.rint(corr[..., 0]).astype(int)
-map_x = np.rint(corr[..., 1]).astype(int)
+    test = Lattice(source, target, grid_size)
+    test.fit(grid_size, M, iters)
+    corr = test.correspondence_map()
+    map_y = np.rint(corr[..., 0]).astype(int)
+    map_x = np.rint(corr[..., 1]).astype(int)
 
-np.savetxt("test_map_x.csv", map_x, fmt="%i", delimiter=",")
-np.savetxt("test_map_y.csv", map_y, fmt="%i", delimiter=",")
+    np.savetxt(f"map_x_{i}.csv", map_x, fmt="%i", delimiter=",")
+    np.savetxt(f"map_y_{i}.csv", map_y, fmt="%i", delimiter=",")

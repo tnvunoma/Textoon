@@ -22,10 +22,8 @@
 
 namespace preprocessing
 {
-
-QImage
-threshold(QImage const & input_image, int v);
-
+    QImage
+    threshold(QImage const & input_image, int v);
 }
 
 #endif
