@@ -95,9 +95,10 @@ void Textoon::processFrames(const QString &inputFolder)
     for (const QFileInfo& f : texFiles)
     {
         bool ok = false;
-        QRgb color = f.baseName().toUInt(&ok, 16);
+        uint rgb = f.baseName().toUInt(&ok, 16);
         if (ok)
         {
+            QRgb color = rgb | 0xFF000000;
             QImage tex(f.absoluteFilePath());
             if (!tex.isNull())
                 textureMap[color] = tex.convertToFormat(QImage::Format_RGB32);
@@ -116,6 +117,7 @@ void Textoon::processFrames(const QString &inputFolder)
     QDir().mkpath(debugDir);
 
     prev.scribbles = loadInitialScribbles(inputFolder);
+    prev.scribbles = dilateScribbles(prev.scribbles, 2);
     prev.scribbles.save(debugDir + "/scribbles_0000.png");
 
     // get lazybrush segmentation
@@ -157,6 +159,7 @@ void Textoon::processFrames(const QString &inputFolder)
 
         // Transfer scribbles
         curr.scribbles = warpImage(prev.scribbles, W);
+        curr.scribbles = dilateScribbles(curr.scribbles, 2);
         curr.scribbles.save(debugDir + "/scribbles_" + frameId + ".png");
 
         // LazyBrush segmentation
@@ -444,6 +447,39 @@ QImage Textoon::warpImage(
     }
 
     return dst;
+}
+
+QImage Textoon::dilateScribbles(const QImage& img, int radius)
+{
+    int w = img.width();
+    int h = img.height();
+
+    QImage out = img.copy();
+
+    for (int y = 0; y < h; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            QColor c(img.pixel(x, y));
+            if (c.alpha() == 0) continue;
+
+            for (int dy = -radius; dy <= radius; ++dy)
+            {
+                for (int dx = -radius; dx <= radius; ++dx)
+                {
+                    int nx = x + dx;
+                    int ny = y + dy;
+
+                    if (nx < 0 || nx >= w || ny < 0 || ny >= h)
+                        continue;
+
+                    out.setPixelColor(nx, ny, c);
+                }
+            }
+        }
+    }
+
+    return out;
 }
 
 QImage Textoon::applySegmentationColors(

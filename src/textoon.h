@@ -50,6 +50,8 @@ private:
         const QImage& src,
         const std::vector<std::vector<QPointF>>& W12);
 
+    QImage dilateScribbles(const QImage& img, int radius);
+
     QImage applySegmentationColors(
         const QImage& lineArt,
         const QImage& segmentation);
