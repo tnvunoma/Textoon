@@ -44,7 +44,7 @@ class Point:
         self.instances.append(point)
 
     def move_to_centroid(self):
-        self.pos = centroid(self.instances, "pos").astype(int)
+        self.pos = centroid(self.instances, "pos")
 
     def push(self, source, target, N, M):
         shift_vector = (0, 0)
@@ -101,7 +101,7 @@ class Square:
         if mu < 1e-10:
             return
 
-        R = np.array([[a, -b], [b, a]]) / mu
+        R = np.array([[a, b], [-b, a]]) / mu
 
         for i in range(4):
             p_hat = self.local_points[i].init - p_c
@@ -145,13 +145,15 @@ class Lattice:
                 self.squares.append(lattice_sq)
 
     def fit(self, N=10, M=20, iters=30):
-        for _ in range(iters):
+        for k in range(iters):
             for point in self.points_flat:
                 point.push(self.source, self.target, N, M)
-            for sq in self.squares:
-                sq.regularize()
-            for p in self.points_flat:
-                p.move_to_centroid()
+            inner_iters = max(32, round(256 - (256 - 32) / 50 * k))
+            for _ in range(inner_iters):
+                for sq in self.squares:
+                    sq.regularize()
+                for p in self.points_flat:
+                    p.move_to_centroid()
 
     def correspondence_map(self) -> np.ndarray:
         pos_grid = np.zeros((self.rows, self.cols, 2), dtype=np.float64)
