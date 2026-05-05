@@ -104,7 +104,7 @@ public:
 
     QImage generate(QImage img, QImage layer_map);
 
-    void constructLaplacian();
+    void constructLaplacian(const unordered_set<int>& boundary_vals);
     //QImage computeImageGradient(QImage img); // use sobel filter?;
     // void computeBoundaryValues();
     // void computeIntermediateValues();
