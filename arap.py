@@ -44,7 +44,7 @@ class Point:
         self.instances.append(point)
 
     def move_to_centroid(self):
-        self.pos = centroid(self.instances, "pos").astype(int)
+        self.pos = centroid(self.instances, "pos")
 
     def push(self, source, target, N, M):
         shift_vector = (0, 0)
@@ -101,7 +101,7 @@ class Square:
         if mu < 1e-10:
             return
 
-        R = np.array([[a, -b], [b, a]]) / mu
+        R = np.array([[a, b], [-b, a]]) / mu
 
         for i in range(4):
             p_hat = self.local_points[i].init - p_c
@@ -145,13 +145,15 @@ class Lattice:
                 self.squares.append(lattice_sq)
 
     def fit(self, N=10, M=20, iters=30):
-        for _ in range(iters):
+        for k in range(iters):
             for point in self.points_flat:
                 point.push(self.source, self.target, N, M)
-            for sq in self.squares:
-                sq.regularize()
-            for p in self.points_flat:
-                p.move_to_centroid()
+            inner_iters = max(32, round(256 - (256 - 32) / 50 * k))
+            for _ in range(inner_iters):
+                for sq in self.squares:
+                    sq.regularize()
+                for p in self.points_flat:
+                    p.move_to_centroid()
 
     def correspondence_map(self) -> np.ndarray:
         pos_grid = np.zeros((self.rows, self.cols, 2), dtype=np.float64)
@@ -180,18 +182,19 @@ class Lattice:
         return np.stack([new_xy[..., 1], new_xy[..., 0]], axis=-1)
 
 
-source = plt.imread("dummy_data/arap_test/small_walk_0000.png")[:, :, :3]
-target = plt.imread("dummy_data/arap_test/small_walk_0002.png")[:, :, :3]
+for i in range(5):
+    source = plt.imread(f"dummy_data/walk1/small_walk_{(i*2):04}.png")[:, :, :3]
+    target = plt.imread(f"dummy_data/walk1/small_walk_{(i*2+2):04}.png")[:, :, :3]
 
-grid_size = 20
-M = 40
-iters = 20
+    grid_size = 20
+    M = 40
+    iters = 20
 
-test = Lattice(source, target, grid_size)
-test.fit(grid_size, M, iters)
-corr = test.correspondence_map()
-map_y = np.rint(corr[..., 0]).astype(int)
-map_x = np.rint(corr[..., 1]).astype(int)
+    test = Lattice(source, target, grid_size)
+    test.fit(grid_size, M, iters)
+    corr = test.correspondence_map()
+    map_y = np.rint(corr[..., 0]).astype(int)
+    map_x = np.rint(corr[..., 1]).astype(int)
 
-np.savetxt("test_map_x.csv", map_x, fmt="%i", delimiter=",")
-np.savetxt("test_map_y.csv", map_y, fmt="%i", delimiter=",")
+    np.savetxt(f"map_x_{i}.csv", map_x, fmt="%i", delimiter=",")
+    np.savetxt(f"map_y_{i}.csv", map_y, fmt="%i", delimiter=",")

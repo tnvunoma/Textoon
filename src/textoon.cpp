@@ -95,9 +95,10 @@ void Textoon::processFrames(const QString &inputFolder)
     for (const QFileInfo& f : texFiles)
     {
         bool ok = false;
-        QRgb color = f.baseName().toUInt(&ok, 16);
+        uint rgb = f.baseName().toUInt(&ok, 16);
         if (ok)
         {
+            QRgb color = rgb | 0xFF000000;
             QImage tex(f.absoluteFilePath());
             if (!tex.isNull())
                 textureMap[color] = tex.convertToFormat(QImage::Format_RGB32);
@@ -116,7 +117,9 @@ void Textoon::processFrames(const QString &inputFolder)
     QDir().mkpath(debugDir);
 
     prev.scribbles = loadInitialScribbles(inputFolder);
-    prev.scribbles.save(debugDir + "/scribbles_0000.png");
+    // prev.scribbles = dilateScribbles(prev.scribbles, 2);
+    QImage debugScribbles0 = overlayScribbles(rawLine0, prev.scribbles);
+    debugScribbles0.save(debugDir + "/scribbles_0000.png");
 
     // get lazybrush segmentation
     prev.segmentation = scribbleContext->colorize(prev.scribbles, prev.image);
@@ -157,7 +160,9 @@ void Textoon::processFrames(const QString &inputFolder)
 
         // Transfer scribbles
         curr.scribbles = warpImage(prev.scribbles, W);
-        curr.scribbles.save(debugDir + "/scribbles_" + frameId + ".png");
+        // curr.scribbles = dilateScribbles(curr.scribbles, 15);
+        QImage debugScribbles = overlayScribbles(rawLine, curr.scribbles);
+        debugScribbles.save(debugDir + "/scribbles_" + frameId + ".png");
 
         // LazyBrush segmentation
         curr.segmentation = scribbleContext->colorize(curr.scribbles, curr.image);
@@ -446,6 +451,74 @@ QImage Textoon::warpImage(
     return dst;
 }
 
+// QImage Textoon::dilateScribbles(const QImage& img, int radius)
+// {
+//     int w = img.width();
+//     int h = img.height();
+//     QImage out(w, h, QImage::Format_ARGB32);
+//     out.fill(Qt::transparent);
+
+//     for (int y = 0; y < h; ++y)
+//     {
+//         for (int x = 0; x < w; ++x)
+//         {
+//             for (int dy = -radius; dy <= radius; ++dy)
+//             {
+//                 for (int dx = -radius; dx <= radius; ++dx)
+//                 {
+//                     int nx = x + dx;
+//                     int ny = y + dy;
+//                     if (nx < 0 || nx >= w || ny < 0 || ny >= h)
+//                         continue;
+
+//                     QColor c(img.pixel(nx, ny));
+//                     if (c.alpha() == 0) continue;
+
+//                     out.setPixelColor(x, y, c);
+//                     goto next_pixel;
+//                 }
+//             }
+//         next_pixel:;
+//         }
+//     }
+//     return out;
+// }
+
+QImage Textoon::overlayScribbles(
+    const QImage& base,
+    const QImage& scribbles)
+{
+    int w = base.width();
+    int h = base.height();
+
+    QImage result = base.convertToFormat(QImage::Format_ARGB32);
+    QImage scrib = scribbles.convertToFormat(QImage::Format_ARGB32);
+
+    for (int y = 0; y < h; ++y)
+    {
+        QRgb* dstLine = reinterpret_cast<QRgb*>(result.scanLine(y));
+        const QRgb* srcLine = reinterpret_cast<const QRgb*>(scrib.scanLine(y));
+
+        for (int x = 0; x < w; ++x)
+        {
+            QRgb s = srcLine[x];
+
+            int a = qAlpha(s);
+            int r = qRed(s);
+            int g = qGreen(s);
+            int b = qBlue(s);
+
+            if (a == 0) continue;
+            if (r == 0 && g == 0 && b == 0) continue;
+
+            dstLine[x] = s;
+        }
+    }
+
+    return result;
+}
+
+
 QImage Textoon::applySegmentationColors(
     const QImage& lineArt,
     const QImage& segmentation)
@@ -497,46 +570,65 @@ Textoon::transferUV(
 {
     int h = prevUV.size();
     int w = prevUV[0].size();
-
     std::vector<std::vector<UV>> T2(h, std::vector<UV>(w, {0.f, 0.f}));
     std::vector<std::vector<bool>> assigned(h, std::vector<bool>(w, false));
 
     // ---------------------------------
-    // Step 1: Forward warp
+    // Forward warp with bilinear splatting
     // ---------------------------------
+    std::vector<std::vector<float>> accumU(h, std::vector<float>(w, 0.f));
+    std::vector<std::vector<float>> accumV(h, std::vector<float>(w, 0.f));
+    std::vector<std::vector<float>> accumW(h, std::vector<float>(w, 0.f));
+
     for (int y = 0; y < h; ++y)
     {
         for (int x = 0; x < w; ++x)
         {
             QPointF qf = W12[y][x];
+            int x0 = (int)std::floor(qf.x());
+            int y0 = (int)std::floor(qf.y());
+            float fx = qf.x() - x0;
+            float fy = qf.y() - y0;
 
-            int qx = std::round(qf.x());
-            int qy = std::round(qf.y());
+            float w00 = (1.f - fx) * (1.f - fy);
+            float w10 = fx           * (1.f - fy);
+            float w01 = (1.f - fx) * fy;
+            float w11 = fx           * fy;
 
-            if (qx < 0 || qx >= w || qy < 0 || qy >= h)
-                continue;
-
-            if (!assigned[qy][qx])
+            auto splat = [&](int nx, int ny, float wt)
             {
-                T2[qy][qx] = prevUV[y][x];
-                assigned[qy][qx] = true;
-            }
-            else
+                if (nx < 0 || nx >= w || ny < 0 || ny >= h) return;
+                accumU[ny][nx] += prevUV[y][x].u * wt;
+                accumV[ny][nx] += prevUV[y][x].v * wt;
+                accumW[ny][nx] += wt;
+            };
+            splat(x0,     y0,     w00);
+            splat(x0 + 1, y0,     w10);
+            splat(x0,     y0 + 1, w01);
+            splat(x0 + 1, y0 + 1, w11);
+        }
+    }
+
+    for (int y = 0; y < h; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            if (accumW[y][x] > 0.f)
             {
-                T2[qy][qx].u = 0.5f * (T2[qy][qx].u + prevUV[y][x].u);
-                T2[qy][qx].v = 0.5f * (T2[qy][qx].v + prevUV[y][x].v);
+                T2[y][x] = { accumU[y][x] / accumW[y][x],
+                            accumV[y][x] / accumW[y][x] };
+                assigned[y][x] = true;
             }
         }
     }
 
     // ---------------------------------
-    // Step 2: Process each region
+    // Process each region
     // ---------------------------------
     for (const auto& [color, pixels] : regions)
     {
         std::vector<QPoint> known;
         std::vector<QPoint> unknown;
-
         for (const QPoint& p : pixels)
         {
             if (assigned[p.y()][p.x()])
@@ -544,18 +636,15 @@ Textoon::transferUV(
             else
                 unknown.push_back(p);
         }
-
         if (known.size() < 5 || unknown.empty())
             continue;
 
         // ---------------------------------
         // Subsample control points
         // ---------------------------------
-        const int MAX_CTRL = 40;
+        const int MAX_CTRL = 80;
         std::vector<QPoint> sampled;
-
         int step = std::max(1, (int)known.size() / MAX_CTRL);
-
         for (int i = 0;
              i < (int)known.size() && (int)sampled.size() < MAX_CTRL;
              i += step)
@@ -567,7 +656,6 @@ Textoon::transferUV(
         // Build region mask
         // ---------------------------------
         std::vector<std::vector<bool>> mask(h, std::vector<bool>(w, false));
-
         for (const QPoint& p : pixels)
             mask[p.y()][p.x()] = true;
 
@@ -575,7 +663,6 @@ Textoon::transferUV(
         // Distance maps
         // ---------------------------------
         std::vector<std::vector<std::vector<float>>> allDist;
-
         for (const auto& p : sampled)
             allDist.push_back(computeDistanceMap(w, h, mask, p));
 
@@ -583,13 +670,11 @@ Textoon::transferUV(
         // TPS fit
         // ---------------------------------
         std::vector<double> values_u, values_v;
-
         for (const auto& p : sampled)
         {
             values_u.push_back(T2[p.y()][p.x()].u);
             values_v.push_back(T2[p.y()][p.x()].v);
         }
-
         TPS tps_u = fitTPS(sampled, values_u, allDist);
         TPS tps_v = fitTPS(sampled, values_v, allDist);
 
@@ -602,7 +687,6 @@ Textoon::transferUV(
             T2[p.y()][p.x()].v = evaluateTPS(tps_v, p, allDist);
         }
     }
-
     return T2;
 }
 

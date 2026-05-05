@@ -50,6 +50,9 @@ add_executable(${PROJECT_NAME}
     src/depthmapgenerator.h
     src/depthmapgenerator.cpp
 
+    src/postprocessing.h
+    src/postprocessing.cpp
+
     util/obj_loader.h
     util/vector_utils.h
 
