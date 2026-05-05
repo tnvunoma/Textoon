@@ -2,9 +2,16 @@
 #include <Eigen/Sparse>
 #include <map>
 #include <cmath>
+#include <unordered_map>
+
 
 using SpMat = Eigen::SparseMatrix<double>;
 using Triplet = Eigen::Triplet<double>;
+struct QPointHash {
+    size_t operator()(const QPoint& p) const {
+        return std::hash<int>()(p.x()) ^ (std::hash<int>()(p.y()) << 1);
+    }
+};
 
 std::vector<std::vector<PostProcessing::UV>>
 PostProcessing::textureRounding(
@@ -43,7 +50,7 @@ PostProcessing::textureRounding(
             continue;
 
         // map pixel -> local index
-        std::map<QPoint, int> idx;
+        std::unordered_map<QPoint, int, QPointHash> idx;
         for (int i = 0; i < n; ++i)
             idx[pixels[i]] = i;
 

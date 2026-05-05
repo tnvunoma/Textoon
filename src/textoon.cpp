@@ -117,8 +117,9 @@ void Textoon::processFrames(const QString &inputFolder)
     QDir().mkpath(debugDir);
 
     prev.scribbles = loadInitialScribbles(inputFolder);
-    prev.scribbles = dilateScribbles(prev.scribbles, 2);
-    prev.scribbles.save(debugDir + "/scribbles_0000.png");
+    // prev.scribbles = dilateScribbles(prev.scribbles, 2);
+    QImage debugScribbles0 = overlayScribbles(rawLine0, prev.scribbles);
+    debugScribbles0.save(debugDir + "/scribbles_0000.png");
 
     // get lazybrush segmentation
     prev.segmentation = scribbleContext->colorize(prev.scribbles, prev.image);
@@ -159,8 +160,9 @@ void Textoon::processFrames(const QString &inputFolder)
 
         // Transfer scribbles
         curr.scribbles = warpImage(prev.scribbles, W);
-        curr.scribbles = dilateScribbles(curr.scribbles, 2);
-        curr.scribbles.save(debugDir + "/scribbles_" + frameId + ".png");
+        // curr.scribbles = dilateScribbles(curr.scribbles, 15);
+        QImage debugScribbles = overlayScribbles(rawLine, curr.scribbles);
+        debugScribbles.save(debugDir + "/scribbles_" + frameId + ".png");
 
         // LazyBrush segmentation
         curr.segmentation = scribbleContext->colorize(curr.scribbles, curr.image);
@@ -449,38 +451,73 @@ QImage Textoon::warpImage(
     return dst;
 }
 
-QImage Textoon::dilateScribbles(const QImage& img, int radius)
-{
-    int w = img.width();
-    int h = img.height();
+// QImage Textoon::dilateScribbles(const QImage& img, int radius)
+// {
+//     int w = img.width();
+//     int h = img.height();
+//     QImage out(w, h, QImage::Format_ARGB32);
+//     out.fill(Qt::transparent);
 
-    QImage out = img.copy();
+//     for (int y = 0; y < h; ++y)
+//     {
+//         for (int x = 0; x < w; ++x)
+//         {
+//             for (int dy = -radius; dy <= radius; ++dy)
+//             {
+//                 for (int dx = -radius; dx <= radius; ++dx)
+//                 {
+//                     int nx = x + dx;
+//                     int ny = y + dy;
+//                     if (nx < 0 || nx >= w || ny < 0 || ny >= h)
+//                         continue;
+
+//                     QColor c(img.pixel(nx, ny));
+//                     if (c.alpha() == 0) continue;
+
+//                     out.setPixelColor(x, y, c);
+//                     goto next_pixel;
+//                 }
+//             }
+//         next_pixel:;
+//         }
+//     }
+//     return out;
+// }
+
+QImage Textoon::overlayScribbles(
+    const QImage& base,
+    const QImage& scribbles)
+{
+    int w = base.width();
+    int h = base.height();
+
+    QImage result = base.convertToFormat(QImage::Format_ARGB32);
+    QImage scrib = scribbles.convertToFormat(QImage::Format_ARGB32);
 
     for (int y = 0; y < h; ++y)
     {
+        QRgb* dstLine = reinterpret_cast<QRgb*>(result.scanLine(y));
+        const QRgb* srcLine = reinterpret_cast<const QRgb*>(scrib.scanLine(y));
+
         for (int x = 0; x < w; ++x)
         {
-            QColor c(img.pixel(x, y));
-            if (c.alpha() == 0) continue;
+            QRgb s = srcLine[x];
 
-            for (int dy = -radius; dy <= radius; ++dy)
-            {
-                for (int dx = -radius; dx <= radius; ++dx)
-                {
-                    int nx = x + dx;
-                    int ny = y + dy;
+            int a = qAlpha(s);
+            int r = qRed(s);
+            int g = qGreen(s);
+            int b = qBlue(s);
 
-                    if (nx < 0 || nx >= w || ny < 0 || ny >= h)
-                        continue;
+            if (a == 0) continue;
+            if (r == 0 && g == 0 && b == 0) continue;
 
-                    out.setPixelColor(nx, ny, c);
-                }
-            }
+            dstLine[x] = s;
         }
     }
 
-    return out;
+    return result;
 }
+
 
 QImage Textoon::applySegmentationColors(
     const QImage& lineArt,

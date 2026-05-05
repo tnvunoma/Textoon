@@ -52,6 +52,10 @@ private:
 
     QImage dilateScribbles(const QImage& img, int radius);
 
+    QImage overlayScribbles(
+        const QImage& base,
+        const QImage& scribbles);
+
     QImage applySegmentationColors(
         const QImage& lineArt,
         const QImage& segmentation);
