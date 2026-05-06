@@ -182,9 +182,9 @@ class Lattice:
         return np.stack([new_xy[..., 1], new_xy[..., 0]], axis=-1)
 
 
-for i in range(5):
-    source = plt.imread(f"dummy_data/walk1/small_walk_{(i*2):04}.png")[:, :, :3]
-    target = plt.imread(f"dummy_data/walk1/small_walk_{(i*2+2):04}.png")[:, :, :3]
+for i in range(1,5):
+    source = plt.imread(f"dummy_data/hair/out{i}.png")[:, :, :3]
+    target = plt.imread(f"dummy_data/hair/out{i+1}.png")[:, :, :3]
 
     grid_size = 16
     M = 48
