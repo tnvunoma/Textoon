@@ -101,7 +101,7 @@ class Square:
         if mu < 1e-10:
             return
 
-        R = np.array([[a, b], [-b, a]]) / mu
+        R = np.array([[a, -b], [b, a]]) / mu
 
         for i in range(4):
             p_hat = self.local_points[i].init - p_c
