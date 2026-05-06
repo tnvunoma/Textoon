@@ -47,8 +47,8 @@ add_executable(${PROJECT_NAME}
     src/mainwindow.h
     src/textoon.h
 
-    src/depthmapgenerator.h
-    src/depthmapgenerator.cpp
+    src/normalmapgenerator.h
+    src/normalmapgenerator.cpp
 
     src/postprocessing.h
     src/postprocessing.cpp

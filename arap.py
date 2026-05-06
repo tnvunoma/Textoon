@@ -186,9 +186,9 @@ for i in range(5):
     source = plt.imread(f"dummy_data/walk1/small_walk_{(i*2):04}.png")[:, :, :3]
     target = plt.imread(f"dummy_data/walk1/small_walk_{(i*2+2):04}.png")[:, :, :3]
 
-    grid_size = 20
-    M = 40
-    iters = 20
+    grid_size = 16
+    M = 48
+    iters = 30
 
     test = Lattice(source, target, grid_size)
     test.fit(grid_size, M, iters)

@@ -29,29 +29,30 @@ struct DepthInequalityGraph {
 pixel utilities
 
 */
-inline bool outOfBounds(int index, int increment, int row_size, int size ){
+inline bool inBounds(int index, int increment, int row_size, int size ){
     int newIndex = index+increment;
-    bool rowBounds = (index > size) || (index < 0); // are we exceeding row bounds?
-    bool colBounds = newIndex/row_size != index/row_size; // column consistency - are we exceeding column bounds?
+    bool rowBounds = newIndex < size && newIndex >= 0; // are we exceeding row bounds?
+    bool colBounds = (abs(increment) != 1 || newIndex/row_size == index/row_size); // column consistency - are we exceeding column bounds?
     // alt condition: = newIndex % row_size > col or newIndex % row_size < 0
+
     return rowBounds && colBounds;
 }
 
-inline unordered_set<int> getValidNeighbors(int index, int row, int col){
+inline unordered_set<int> getValidNeighbors(int index, int rows, int cols){
     unordered_set<int> neighbors;
-    if (!outOfBounds(index, -col, col, row*col)){
-        neighbors.insert(index-col);
+    if (inBounds(index, -cols, cols, rows*cols)){
+        neighbors.insert(index-cols);
     }
 
-    if (!outOfBounds(index, col, col, row*col)){
-        neighbors.insert(index+col);
+    if (inBounds(index, cols, cols, rows*cols)){
+        neighbors.insert(index+cols);
     }
 
-    if (!outOfBounds(index, 1, col, row*col)){
+    if (inBounds(index, 1, cols, rows*cols)){
         neighbors.insert(index+1);
     }
 
-    if (!outOfBounds(index, -1, col, row*col)){
+    if (inBounds(index, -1, cols, rows*cols)){
         neighbors.insert(index-1);
     }
 
@@ -94,17 +95,19 @@ class NormalMapGenerator
 {
 public:
 
-    QImage* original_image; // image gradient - generated with sobel filter (could use opencv)
+    QImage* original_image;
 
-    QImage I; // image gradient - generated with sobel filter (could use opencv)
+    QImage layer_map; // can compute from grayscale
     SparseMatrix<float> L; // laplacian for depth inequalities
-    QSize dims;
+    MatrixXf b;
+    int height, width;
 
     NormalMapGenerator(QImage* image);
 
-    QImage generate(QImage img, QImage layer_map);
+    QImage generate();
 
-    void constructLaplacian(const unordered_set<int>& boundary_vals);
+    bool isBoundary(QRgb *data, int i, unordered_set<int> neighbors);
+    void constructMatrices();
     //QImage computeImageGradient(QImage img); // use sobel filter?;
     // void computeBoundaryValues();
     // void computeIntermediateValues();

@@ -5,6 +5,7 @@
 #include "src/scribblecontext.h"
 #include <iostream>
 #include <QDir>
+#include <normalmapgenerator.h>
 
 
 int main(int argc, char *argv[])
@@ -31,6 +32,15 @@ int main(int argc, char *argv[])
 
     lzwindow* lazyb_window = new lzwindow(scribble_context);
     lazyb_window->show();
+
+    // QImage *i = new QImage("test/scribble_0.png");
+    // if (!i->isNull()){
+    //     NormalMapGenerator n(i);
+    //     if(!n.generate().save("test/normals.jpg")){
+    //         std::cerr << "Failed to save." << std::endl;
+    //     }
+    // }
+
 
 
     /*

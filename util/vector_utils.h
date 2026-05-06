@@ -7,7 +7,7 @@ const float BIG_EPSILON = 1e-3;
 
 // verifies if the matrix is symmetric positive definite
 inline bool isSPD(Eigen::MatrixXf mat){
-    if (mat.transpose() == mat){
+    if (mat.isApprox(mat.transpose())){
         Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> solver(mat);
 
         Eigen::VectorXf eigenvalues = solver.eigenvalues();
