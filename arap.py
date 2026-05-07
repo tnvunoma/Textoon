@@ -247,63 +247,6 @@ class Lattice:
         u = ((xs - j_idx * self.grid_size) / self.grid_size)[..., None]
         v = ((ys - i_idx * self.grid_size) / self.grid_size)[..., None]
 
-source = plt.imread("source.png")[:, :, :3]
-target = plt.imread("target.png")[:, :, :3]
-test = Lattice(source, target, 7)
-for i in range(5):
-    for point in test.points_flat:
-        point.push(source, target, 10, 20)
-
-    for square in test.squares:
-        square.regularize()
-    for point in test.points_flat:
-        point.move_to_centroid()
-
-init_pos = np.array([p.init for p in test.points_flat], dtype=float)
-final_pos = np.array([p.pos for p in test.points_flat], dtype=float)
-
-H, W, C = source.shape
-pts_target = final_pos
-pts_source = init_pos
-
-ys, xs = np.meshgrid(np.arange(100), np.arange(100), indexing="ij")
-corr = test.correspondence_map()
-map_y = np.rint(corr[..., 0]).astype(int)
-map_x = np.rint(corr[..., 1]).astype(int)
-
-warped = np.zeros_like(source)
-warped[map_y, map_x] = source[ys, xs]
-
-fig, axes = plt.subplots(1, 3, figsize=(21, 7))
-
-axes[0].imshow(source)
-axes[0].scatter(init_pos[:, 0], init_pos[:, 1], color="red", s=14, zorder=3)
-axes[0].set_title("Source")
-axes[0].axis("off")
-
-axes[1].imshow(target)
-axes[1].set_title("Target")
-axes[1].axis("off")
-
-axes[2].imshow(np.clip(warped, 0, 1))
-axes[2].scatter(final_pos[:, 0], final_pos[:, 1], color="blue", s=14, zorder=3)
-for ip, fp in zip(init_pos, final_pos):
-    if np.linalg.norm(fp - ip) > 0.5:
-        axes[2].annotate(
-            "",
-            xy=(fp[0], fp[1]),
-            xytext=(ip[0], ip[1]),
-            arrowprops=dict(
-                arrowstyle="->", color="green", lw=0.7, shrinkA=0, shrinkB=0
-            ),
-            zorder=2,
-        )
-axes[2].set_title("Warped source")
-axes[2].axis("off")
-
-plt.tight_layout()
-plt.show()
-
         P00 = pos_grid[i_idx, j_idx]
         P01 = pos_grid[i_idx, j_idx + 1]
         P10 = pos_grid[i_idx + 1, j_idx]
@@ -318,7 +261,7 @@ plt.show()
         return np.stack([new_xy[..., 1], new_xy[..., 0]], axis=-1)
 
 
-for i in range(5):
+for i in range(15):
     source = plt.imread(f"dummy_data/walk1/small_walk_{(i * 2):04}.png")[:, :, :3]
     target = plt.imread(f"dummy_data/walk1/small_walk_{(i * 2 + 2):04}.png")[:, :, :3]
 
@@ -332,5 +275,5 @@ for i in range(5):
     map_y = np.rint(corr[..., 0]).astype(int)
     map_x = np.rint(corr[..., 1]).astype(int)
 
-    np.savetxt(f"map_x_{i}.csv", map_x, fmt="%i", delimiter=",")
-    np.savetxt(f"map_y_{i}.csv", map_y, fmt="%i", delimiter=",")
+    np.savetxt(f"dummy_data/walk1/map_x_{i}.csv", map_x, fmt="%i", delimiter=",")
+    np.savetxt(f"dummy_data/walk1/map_y_{i}.csv", map_y, fmt="%i", delimiter=",")
