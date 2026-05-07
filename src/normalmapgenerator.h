@@ -24,7 +24,36 @@ struct DepthInequalityGraph {
     std::set<Vector2f> path;
 };
 
+enum direction {
+    NORTH,
+    SOUTH,
+    WEST,
+    EAST
+};
 
+struct NeighboringPixel {
+    int index;
+    direction d;
+    NeighboringPixel* opposite_dir;
+
+    bool operator==(const NeighboringPixel& other) const {
+        return index == other.index &&
+               d == other.d &&
+               opposite_dir == other.opposite_dir;
+    }
+
+    NeighboringPixel(int idx, direction dir) : index(idx), d(dir) {}
+};
+
+// struct NeighboringPixelHash {
+//     std::size_t operator()(const NeighboringPixel& p) const {
+//         std::size_t h1 = std::hash<int>{}(p.index);
+//         std::size_t h2 = std::hash<int>{}(static_cast<int>(p.d));
+//         std::size_t h3 = std::hash<void*>{}(static_cast<void*>(p.opposite_dir));
+
+//         return h1 ^ (h2 << 1) ^ (h3 << 2);
+//     }
+// };
 /*
 pixel utilities
 
@@ -38,27 +67,61 @@ inline bool inBounds(int index, int increment, int row_size, int size ){
     return rowBounds && colBounds;
 }
 
-inline unordered_set<int> getValidNeighbors(int index, int rows, int cols){
-    unordered_set<int> neighbors;
+inline std::vector<std::unique_ptr<NeighboringPixel>> getValidNeighbors(int index, int rows, int cols){
+    /// TODO: fix pointer...
+    ///
+    std::vector<std::unique_ptr<NeighboringPixel>> neighbors;
+    NeighboringPixel *north = nullptr, *south = nullptr, *east = nullptr, *west = nullptr;
     if (inBounds(index, -cols, cols, rows*cols)){
-        neighbors.insert(index-cols);
+        neighbors.push_back(make_unique<NeighboringPixel>(index-cols, NORTH));
     }
-
     if (inBounds(index, cols, cols, rows*cols)){
-        neighbors.insert(index+cols);
-    }
-
-    if (inBounds(index, 1, cols, rows*cols)){
-        neighbors.insert(index+1);
+        neighbors.push_back(make_unique<NeighboringPixel>(index+cols, SOUTH));
+        south = neighbors.back().get();
     }
 
     if (inBounds(index, -1, cols, rows*cols)){
-        neighbors.insert(index-1);
+        neighbors.push_back(make_unique<NeighboringPixel>(index-1, WEST));
+        west = neighbors.back().get();
     }
+
+    if (inBounds(index, 1, cols, rows*cols)){
+        neighbors.push_back(make_unique<NeighboringPixel>(index+1, EAST));
+        east = neighbors.back().get();
+    }
+
+    if (north && south) {
+        north->opposite_dir = south;
+        south->opposite_dir = north;
+    }
+    if (west && east) { west->opposite_dir = east; east->opposite_dir = west; }
 
     // NSWE order, not minding exclusions due to bounds failures
     return neighbors;
+
 }
+
+// inline unordered_set<int> getValidNeighbors(int index, int rows, int cols){
+//     unordered_set<int> neighbors;
+//     if (inBounds(index, -cols, cols, rows*cols)){
+//         neighbors.insert(index-cols);
+//     }
+
+//     if (inBounds(index, cols, cols, rows*cols)){
+//         neighbors.insert(index+cols);
+//     }
+
+//     if (inBounds(index, 1, cols, rows*cols)){
+//         neighbors.insert(index+1);
+//     }
+
+//     if (inBounds(index, -1, cols, rows*cols)){
+//         neighbors.insert(index-1);
+//     }
+
+//     // NSWE order, not minding exclusions due to bounds failures
+//     return neighbors;
+// }
 
 
 /*
@@ -106,13 +169,13 @@ public:
 
     QImage generate();
 
-    bool isBoundary(QRgb *data, int i, unordered_set<int> neighbors);
-    void constructMatrices();
-    //QImage computeImageGradient(QImage img); // use sobel filter?;
-    // void computeBoundaryValues();
-    // void computeIntermediateValues();
 
 private:
+    std::pair<int, int> convertToRC(int index);
     void eigenMatrixToQImage(MatrixXf mat, QRgb *data);
+    void constructMatrices();
+    bool onAnySilhouette(QRgb *data, int i, std::vector<std::unique_ptr<NeighboringPixel>>& neighbors);
+    bool onSilhouette(QRgb *data, int i, int j);
+    bool belowOccludingObject(QRgb *data, int i, int j);
 
 };
