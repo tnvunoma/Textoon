@@ -685,8 +685,56 @@ Textoon::transferUV(
         {
             T2[p.y()][p.x()].u = evaluateTPS(tps_u, p, allDist);
             T2[p.y()][p.x()].v = evaluateTPS(tps_v, p, allDist);
+            assigned[p.y()][p.x()] = true;
+        }
+
+        // ---------------------------------
+        // Final fallback: fill any remaining holes
+        // ---------------------------------
+        for (int y = 0; y < h; ++y)
+        {
+            for (int x = 0; x < w; ++x)
+            {
+                if (assigned[y][x]) continue;
+
+                // nearest neighbor search
+                bool found = false;
+
+                for (int r = 1; r <= 5 && !found; ++r)
+                {
+                    for (int dy = -r; dy <= r && !found; ++dy)
+                    {
+                        for (int dx = -r; dx <= r; ++dx)
+                        {
+                            int nx = x + dx;
+                            int ny = y + dy;
+
+                            if (nx < 0 || ny < 0 || nx >= w || ny >= h)
+                                continue;
+
+                            if (assigned[ny][nx])
+                            {
+                                T2[y][x] = T2[ny][nx];
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (found)
+                    assigned[y][x] = true;
+            }
         }
     }
+
+    int holes = 0;
+    for (int y = 0; y < h; ++y)
+        for (int x = 0; x < w; ++x)
+            if (!assigned[y][x]) holes++;
+
+    qDebug() << "Unassigned UV pixels:" << holes;
+
     return T2;
 }
 
