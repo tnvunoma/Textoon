@@ -117,14 +117,14 @@ class Lattice:
         self.points_flat: List[Point] = []
         self.squares: List[Square] = []
 
-        H, W, C = source.shape
+        H, W = source.shape[:2]
         self.H, self.W, self.grid_size = H, W, grid_size
         self.rows = ceil(H / grid_size) + 1
         self.cols = ceil(W / grid_size) + 1
 
-        i_range = (np.arange(self.rows) * grid_size).clip(0, H - 1)
-        j_range = (np.arange(self.cols) * grid_size).clip(0, W - 1)
-        I, J = np.meshgrid(i_range, j_range, indexing="ij")
+        self.i_range = (np.arange(self.rows) * grid_size).clip(0, H - 1)
+        self.j_range = (np.arange(self.cols) * grid_size).clip(0, W - 1)
+        I, J = np.meshgrid(self.i_range, self.j_range, indexing="ij")
         lattice_init = np.stack((I, J), axis=-1)
 
         for i in range(self.rows):
@@ -132,17 +132,96 @@ class Lattice:
             for j in range(self.cols):
                 lattice_coord = lattice_init[i, j]
                 lattice_point = Point(lattice_coord[1], lattice_coord[0])
-                self.points_flat.append(lattice_point)
                 row.append(lattice_point)
             self.points.append(row)
 
+        active = self._get_active_squares()
+        point_used = [[False for c in range(self.cols)] for r in range(self.rows)]
+
         for i in range(self.rows - 1):
             for j in range(self.cols - 1):
-                points = []
-                for r, c in corners(i, j):
-                    points.append(self.points[r][c])
-                lattice_sq = Square(points)
-                self.squares.append(lattice_sq)
+                if active[i, j]:
+                    for r, c in corners(i, j):
+                        point_used[r][c] = True
+                    sq_points = [self.points[r][c] for r, c in corners(i, j)]
+                    self.squares.append(Square(sq_points))
+
+        for i in range(self.rows):
+            for j in range(self.cols):
+                if point_used[i][j]:
+                    self.points_flat.append(self.points[i][j])
+
+    def _get_active_squares(self) -> np.ndarray:
+        from collections import deque
+
+        n_r, n_c = self.rows - 1, self.cols - 1
+        tol = 0.04 if self.source.dtype.kind == "f" else 10
+
+        uniform = np.zeros((n_r, n_c), dtype=bool)
+        for i in range(n_r):
+            for j in range(n_c):
+                r0, r1 = int(self.i_range[i]), int(self.i_range[i + 1])
+                c0, c1 = int(self.j_range[j]), int(self.j_range[j + 1])
+                patch = self.source[r0:r1, c0:c1]
+                if patch.size > 0:
+                    ref = patch[0, 0].astype(float)
+                    diff = np.abs(patch.astype(float) - ref)
+                    per_pixel = diff.max(axis=-1) if patch.ndim == 3 else diff
+                    uniform[i, j] = bool(np.all(per_pixel <= tol))
+
+        exterior = np.zeros((n_r, n_c), dtype=bool)
+        queue = deque()
+        for i in range(n_r):
+            for j in range(n_c):
+                if (
+                    (i == 0 or i == n_r - 1 or j == 0 or j == n_c - 1)
+                    and uniform[i, j]
+                    and not exterior[i, j]
+                ):
+                    exterior[i, j] = True
+                    queue.append((i, j))
+
+        while queue:
+            i, j = queue.popleft()
+            for di, dj in ((-1, 0), (1, 0), (0, -1), (0, 1)):
+                ni, nj = i + di, j + dj
+                if (
+                    0 <= ni < n_r
+                    and 0 <= nj < n_c
+                    and uniform[ni, nj]
+                    and not exterior[ni, nj]
+                ):
+                    exterior[ni, nj] = True
+                    queue.append((ni, nj))
+
+        return ~exterior
+
+    def visualize(self, ax=None):
+        if ax is None:
+            _, ax = plt.subplots(figsize=(8, 8))
+        ax.imshow(self.source)
+        for sq in self.squares:
+            pts = sq.global_points
+            xs = [
+                pts[0].pos[0],
+                pts[1].pos[0],
+                pts[3].pos[0],
+                pts[2].pos[0],
+                pts[0].pos[0],
+            ]
+            ys = [
+                pts[0].pos[1],
+                pts[1].pos[1],
+                pts[3].pos[1],
+                pts[2].pos[1],
+                pts[0].pos[1],
+            ]
+            ax.plot(xs, ys, color="red", linewidth=0.8)
+        for pt in self.points_flat:
+            ax.plot(pt.pos[0], pt.pos[1], "r.", markersize=3)
+        ax.axis("off")
+        plt.show()
+        return ax
 
     def fit(self, N=10, M=20, iters=30):
         for k in range(iters):
@@ -182,9 +261,9 @@ class Lattice:
         return np.stack([new_xy[..., 1], new_xy[..., 0]], axis=-1)
 
 
-for i in range(5):
-    source = plt.imread(f"dummy_data/walk1/small_walk_{(i*2):04}.png")[:, :, :3]
-    target = plt.imread(f"dummy_data/walk1/small_walk_{(i*2+2):04}.png")[:, :, :3]
+for i in range(15):
+    source = plt.imread(f"dummy_data/walk1/small_walk_{(i * 2):04}.png")[:, :, :3]
+    target = plt.imread(f"dummy_data/walk1/small_walk_{(i * 2 + 2):04}.png")[:, :, :3]
 
     grid_size = 16
     M = 48
@@ -196,5 +275,5 @@ for i in range(5):
     map_y = np.rint(corr[..., 0]).astype(int)
     map_x = np.rint(corr[..., 1]).astype(int)
 
-    np.savetxt(f"map_x_{i}.csv", map_x, fmt="%i", delimiter=",")
-    np.savetxt(f"map_y_{i}.csv", map_y, fmt="%i", delimiter=",")
+    np.savetxt(f"dummy_data/walk1/map_x_{i}.csv", map_x, fmt="%i", delimiter=",")
+    np.savetxt(f"dummy_data/walk1/map_y_{i}.csv", map_y, fmt="%i", delimiter=",")
