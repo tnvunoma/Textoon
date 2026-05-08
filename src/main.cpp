@@ -33,11 +33,10 @@ int main(int argc, char *argv[])
     lzwindow* lazyb_window = new lzwindow(scribble_context);
     lazyb_window->show();
 
-<<<<<<< HEAD
-    QImage *i = new QImage("test/segmentation_0001.png");
+    QImage *i = new QImage("test/dance.png");
     if (!i->isNull()){
         NormalMapGenerator n(i);
-        if(!n.generate().save("test/normals.png")){
+        if(!n.generate().save("test/normals.jpg")){
             std::cerr << "Failed to save." << std::endl;
         } else {
             std::cout << "Done." << std::endl;
@@ -45,20 +44,6 @@ int main(int argc, char *argv[])
     } else {
         std::cerr << "Image returned invalid." << std::endl;
     }
-=======
-    // QImage *i = new QImage("test/depth_map_person.png");
-    // if (!i->isNull()){
-    //     NormalMapGenerator n(i);
-    //     if(!n.generate().save("test/normals.jpg")){
-    //         std::cerr << "Failed to save." << std::endl;
-    //     } else {
-    //         std::cout << "Done." << std::endl;
-    //     }
-    // } else {
-    //     std::cerr << "Image returned invalid." << std::endl;
-    // }
->>>>>>> 166857b6719f6e84c28293f5906a70e08d49fc25
-
 
 
     /*

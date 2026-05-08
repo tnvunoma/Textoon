@@ -17,7 +17,7 @@ bool NormalMapGenerator::onAnySilhouette(QRgb *data, int i, std::vector<std::uni
     // dirichlet boundary condition
     for (const auto& n : neighbors){
         int j = n->index;
-        if (qRed(data[i]) < qRed(data[j])){
+        if (data[i] < data[j]){
             return true;
         }
     }
@@ -27,7 +27,7 @@ bool NormalMapGenerator::onAnySilhouette(QRgb *data, int i, std::vector<std::uni
 bool NormalMapGenerator::onSilhouette(QRgb *data, int i, int j){
     // dirichlet boundary condition
 
-    return qRed(data[i]) > qRed(data[j]);
+    return data[i] > data[j];
 }
 
 bool NormalMapGenerator::belowOccludingObject(QRgb *data, int i, int j){
@@ -35,7 +35,7 @@ bool NormalMapGenerator::belowOccludingObject(QRgb *data, int i, int j){
     // QRgb iColor = data[i];
     // QRgb jColor = data[j];
 
-    return qRed(data[i]) < qRed(data[j]);
+    return data[i] < data[j];
 }
 
 std::pair<int, int> NormalMapGenerator::convertToRC(int index){
