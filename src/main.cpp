@@ -30,20 +30,20 @@ int main(int argc, char *argv[])
                         processor->processFolder(inputFolder, anim_name);
                      });
 
-    // lzwindow* lazyb_window = new lzwindow(scribble_context);
-    // lazyb_window->show();
+    lzwindow* lazyb_window = new lzwindow(scribble_context);
+    lazyb_window->show();
 
-    QImage *i = new QImage("test/depth_map_person.png");
-    if (!i->isNull()){
-        NormalMapGenerator n(i);
-        if(!n.generate().save("test/normals.jpg")){
-            std::cerr << "Failed to save." << std::endl;
-        } else {
-            std::cout << "Done." << std::endl;
-        }
-    } else {
-        std::cerr << "Image returned invalid." << std::endl;
-    }
+    // QImage *i = new QImage("test/depth_map_person.png");
+    // if (!i->isNull()){
+    //     NormalMapGenerator n(i);
+    //     if(!n.generate().save("test/normals.jpg")){
+    //         std::cerr << "Failed to save." << std::endl;
+    //     } else {
+    //         std::cout << "Done." << std::endl;
+    //     }
+    // } else {
+    //     std::cerr << "Image returned invalid." << std::endl;
+    // }
 
 
 

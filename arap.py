@@ -261,13 +261,13 @@ class Lattice:
         return np.stack([new_xy[..., 1], new_xy[..., 0]], axis=-1)
 
 
-for i in range(15):
-    source = plt.imread(f"dummy_data/walk1/small_walk_{(i * 2):04}.png")[:, :, :3]
-    target = plt.imread(f"dummy_data/walk1/small_walk_{(i * 2 + 2):04}.png")[:, :, :3]
+for i in range(10):
+    source = plt.imread(f"dummy_data/dance/out{i:02}.png")[:, :, :3]
+    target = plt.imread(f"dummy_data/dance/out{i+1:02}.png")[:, :, :3]
 
     grid_size = 16
     M = 48
-    iters = 30
+    iters = 10
 
     test = Lattice(source, target, grid_size)
     test.fit(grid_size, M, iters)
@@ -275,5 +275,5 @@ for i in range(15):
     map_y = np.rint(corr[..., 0]).astype(int)
     map_x = np.rint(corr[..., 1]).astype(int)
 
-    np.savetxt(f"dummy_data/walk1/map_x_{i}.csv", map_x, fmt="%i", delimiter=",")
-    np.savetxt(f"dummy_data/walk1/map_y_{i}.csv", map_y, fmt="%i", delimiter=",")
+    np.savetxt(f"dummy_data/dance/map_x_{i}.csv", map_x, fmt="%i", delimiter=",")
+    np.savetxt(f"dummy_data/dance/map_y_{i}.csv", map_y, fmt="%i", delimiter=",")
