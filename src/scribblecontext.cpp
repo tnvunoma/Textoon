@@ -171,10 +171,6 @@ QRect rect_type_to_QRect(rect_type const & rect)
     return QRect(rect.x(), rect.y(), rect.width(), rect.height());
 }
 
-/*
-segments also need to contain depth information - choose some arbitrary depth step
-*/
-// proxy colorize method
 
 QImage ScribbleContext::createMaskByColor(const QRect& bounding, const QImage& original, const QColor& color){
 
@@ -209,7 +205,7 @@ std::unordered_set<short> ScribbleContext::collectLabelsFromScribbles(){
     return labels;
 }
 
-std::map<QRgb, short> ScribbleContext::generateColorToLabelMap(){
+std::map<QRgb, short> ScribbleContext::generateColorToColorInfoMap(){
     // generate a map from labels
     std::map<QRgb, short> map;
     for (const ScribbleInfo& scrib : std::as_const(saved_scribbles)){
@@ -223,6 +219,24 @@ std::map<QRgb, short> ScribbleContext::generateColorToLabelMap(){
     return map;
 }
 
+
+/*
+std::map<QRgb, ColorInfo> ScribbleContext::generateColorToColorInfoMap(){
+    // generate a map from labels
+    std::map<QRgb, ColorInfo> map;
+    for (const ScribbleInfo& scrib : std::as_const(saved_scribbles)){
+
+        ColorInfo info{scrib._label, scrib._depth};
+        QColor color(
+            static_cast<unsigned char>(the_palette[label][0]),
+            static_cast<unsigned char>(the_palette[label][1]),
+            static_cast<unsigned char>(the_palette[label][2]));
+        map[color.rgba()] = info;
+    }
+    return map;
+}
+*/
+
 QVector<ScribbleInfo> ScribbleContext::extractScribblesFromQImage(const QImage& scribbles_image){
     // Extracts scribbles from the image. The scribbles extracted will only be the ones whose labels match
     // current UI elements
@@ -230,7 +244,7 @@ QVector<ScribbleInfo> ScribbleContext::extractScribblesFromQImage(const QImage& 
     QVector<ScribbleInfo> vec;
 
     std::map<short, QRect> rect_map;
-    std::map<QRgb, short> colors_to_labels{generateColorToLabelMap()};
+    std::map<QRgb, short> colors_to_labels{generateColorToColorInfoMap()};
 
     if (colors_to_labels.empty()){
         std::cerr << "Warning: could not access scribble labels." << std::endl;
@@ -361,3 +375,52 @@ QImage ScribbleContext::colorize(const QVector<ScribbleInfo>& scribbles, const Q
 
     return segmnt;
 }
+
+
+// QImage ScribbleContext::depthColorize(const QVector<ScribbleInfo>& scribbles, const QImage& frame){
+//     // Proxy colorize around the internal colorizer
+//     textoons_colorization_context small_context(
+//         0,
+//         0,
+//         _size.width(),
+//         _size.height(),
+//         cell_size,
+//         processPoints(frame));
+
+//     for (const ScribbleInfo& scribble : scribbles){
+//         small_context.append_scribble({scribble.scrib_image, scribble.bounding, scribble._depth});
+//     }
+
+//     QImage segmnt(_size, QImage::Format_ARGB32);
+//     segmnt.fill(Qt::transparent);
+
+//     // qDebug() << "segmnt size:" << segmnt.size()
+//     //          << "isNull:" << segmnt.isNull();
+
+//     std::vector<std::pair<rect_type, label_type>> labeling =
+//         lazybrush::grid_of_quadtrees_colorizer::colorize(small_context, true);
+
+//     QPainter painter(&segmnt);
+
+//     for (auto const & node : labeling)
+//     {
+//         if (node.second != textoons_colorization_context::label_undefined &&
+//             node.second != textoons_colorization_context::label_implicit_surrounding)
+//         {
+//             int const index = node.second;
+//             if (index >= 0 && index < 128)
+//             {
+//                 QColor c =
+//                     QColor
+//                     (
+//                         the_palette[index][0],
+//                         the_palette[index][1],
+//                         the_palette[index][2]
+//                         );
+//                 painter.fillRect(rect_type_to_QRect(node.first), c);
+//             }
+//         }
+//     }
+
+//     return segmnt;
+// }
