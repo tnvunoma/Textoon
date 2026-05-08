@@ -150,8 +150,8 @@ void Textoon::processFrames(const QString &inputFolder)
         QString frameId = QString("%1").arg(i, 4, 10, QChar('0'));
 
         // Load ARAP map
-        auto map_x = loadCsv(inputFolder.toStdString() + "/map_x_" + std::to_string(i) + ".csv");
-        auto map_y = loadCsv(inputFolder.toStdString() + "/map_y_" + std::to_string(i) + ".csv");
+        auto map_x = loadCsv(inputFolder.toStdString() + "/map_x_" + std::to_string(i - 1) + ".csv");
+        auto map_y = loadCsv(inputFolder.toStdString() + "/map_y_" + std::to_string(i - 1) + ".csv");
         if (map_x.empty() || map_y.empty()){
             continue;
         }
