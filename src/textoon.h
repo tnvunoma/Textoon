@@ -46,6 +46,8 @@ private:
 
     std::map<QRgb, std::vector<QPoint>> extractRegions(const QImage& segmentation);
 
+    std::vector<std::vector<QVector3D>> normalImageToVectors(const QImage& normalMap);
+
     QImage warpImage(
         const QImage& src,
         const std::vector<std::vector<QPointF>>& W12);

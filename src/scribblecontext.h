@@ -26,6 +26,8 @@ public:
     label_type _label{-1};
         // label for identification - this is how you id unique scribbles
         // in our case, labels are indices to palette colors
+    label_type _depth{-1};
+    bool usingDepthAsColor = false;
 
     /// FOR US
     ScribbleInfo();
@@ -37,7 +39,6 @@ public:
     {
 
         // Initialize contour points
-        std::vector<point_type> points;
 
         if (!scrib_image.isNull())
         {
@@ -67,13 +68,24 @@ public:
         }
     }
 
+    // ScribbleInfo(ScribbleInfo scribble)
+    //     : scrib_image(std::move(image))
+    //     , bounding(scribble.boundingre)
+    //     , _label(scribble._depth)
+    // {
+
+    //     // Initialize contour points
+
+
+    // }
+
     /// FOR THE COLORIZER
+    std::vector<point_type> points;
 
     rect_type rect() const {
         return rect_type(bounding.x(), bounding.y(), bounding.width(), bounding.height());
     }
 
-    std::vector<point_type> points;
 
     bool contains_point(point_type const& p) const
     {
@@ -104,12 +116,12 @@ public:
     }
 };
 
-struct SegmentInfo
+struct ColorInfo
 {
-    // interface type for internal colorization context
-    QImage image;
-    QRect rect;
+    short color;
+    short depth;
 };
+
 
 class ScribbleContext : public QObject
 {
@@ -156,7 +168,27 @@ public:
     void saveScribblesWithoutImageSize();
 
     std::unordered_set<short> collectLabelsFromScribbles();
-    std::map<QRgb, short> generateColorToLabelMap();
+    std::map<QRgb, short> generateColorToColorInfoMap();
+
+
+    /*
+std::map<QRgb, ColorInfo> generateColorToColorInfoMap();
+
+std::map<QRgb, ColorInfo> ScribbleContext::generateColorToColorInfoMap(){
+    // generate a map from labels
+    std::map<QRgb, ColorInfo> map;
+    for (const ScribbleInfo& scrib : std::as_const(saved_scribbles)){
+
+        ColorInfo info{scrib._label, scrib._depth};
+        QColor color(
+            static_cast<unsigned char>(the_palette[label][0]),
+            static_cast<unsigned char>(the_palette[label][1]),
+            static_cast<unsigned char>(the_palette[label][2]));
+        map[color.rgba()] = info;
+    }
+    return map;
+}
+*/
 
     QVector<ScribbleInfo> extractScribblesFromQImage(const QImage& scribbles_image);
     QImage createMaskByColor(const QRect& bounding, const QImage& original, const QColor& color);

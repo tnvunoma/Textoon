@@ -10,7 +10,6 @@ NormalMapGenerator::NormalMapGenerator(QImage* image) :
     width(image->size().width()),
     original_image(image)
 {
-
     constructMatrices();
 };
 
@@ -18,22 +17,26 @@ bool NormalMapGenerator::onAnySilhouette(QRgb *data, int i, std::vector<std::uni
     // dirichlet boundary condition
     for (const auto& n : neighbors){
         int j = n->index;
-        if (data[j] > data[i]){
+        if (data[i] < data[j]){
             return true;
         }
     }
-    return false;}
+    return false;
+}
 
 bool NormalMapGenerator::onSilhouette(QRgb *data, int i, int j){
     // dirichlet boundary condition
+
     return data[i] > data[j];
 }
 
 bool NormalMapGenerator::belowOccludingObject(QRgb *data, int i, int j){
     // neumann boundary condition
+    // QRgb iColor = data[i];
+    // QRgb jColor = data[j];
+
     return data[i] < data[j];
 }
-
 
 std::pair<int, int> NormalMapGenerator::convertToRC(int index){
     //assert(inBounds(index));
@@ -60,12 +63,33 @@ void NormalMapGenerator::constructMatrices() {
         /// for all neighbors j in the row i must be equal to d'pq
         std::vector<std::unique_ptr<NeighboringPixel>> neighbors = getValidNeighbors(i, height, width);
 
+        // if (i == 813+(width*380)){
+        //     //const auto& [row, col] = convertToRC(i);
+        //     std::cout << "Here!" << std::endl;
+
+        // }
         if (onAnySilhouette(data, i, neighbors)){
             /// TODO: account for direction of boundary?
+
             /// add depth step to RHS while enforcing constraint
             triplets.push_back(T(i, i, 1.f));
-            b.row(i) = RowVector2f{DEPTH_STEP, DEPTH_STEP};
-        } else {
+            //b.row(i) = RowVector2f{DEPTH_STEP, DEPTH_STEP};
+            // for (const auto& n : neighbors){
+            //     int j = n->index;
+            //     direction drct = n->d;
+
+            //     if (onSilhouette(data, i, j)){
+            //         /// add depth step to RHS
+            //         //int sign = -1 + (n->d % 2) * 2;
+            //         if (drct == NORTH || drct == SOUTH){
+            //             b.row(i) += RowVector2f{DEPTH_STEP, 0.f};
+            //         } else {
+            //             b.row(i) += RowVector2f{0.f, DEPTH_STEP};
+            //         }
+            //     }
+            // }
+        }
+        else {
             for (const auto& n : neighbors){
                 int j = n->index;
                 direction drct = n->d;
@@ -79,28 +103,30 @@ void NormalMapGenerator::constructMatrices() {
                     } else {
                         b.row(i) += RowVector2f{0.f, DEPTH_STEP*sign};
                     }
-                } else if (belowOccludingObject(data, i, j)){
-                    /// we're below a boundary, but suppose there was a ghost pixel there;
-                    /// we wnat the normals to be smooth and consistent with the neighbor in the opposite direciton and the ghost pixel.
-                    /// to do this, we can simply add the opposite direction neighbor in the laplacian and a height-step weight to the RHS
+                }
+                // else if (belowOccludingObject(data, i, j)){
+                //     /// we're below a boundary, but suppose there was a ghost pixel there;
+                //     /// we wnat the normals to be smooth and consistent with the neighbor in the opposite direciton and the ghost pixel.
+                //     /// to do this, we can simply add the opposite direction neighbor in the laplacian and a height-step weight to the RHS
 
-                    if (n->opposite_dir){
-                        NeighboringPixel * j_opposite{n->opposite_dir};
-                        direction j_opposite_dir{j_opposite->d};
+                //     if (n->opposite_dir){
+                //         NeighboringPixel * j_opposite{n->opposite_dir};
+                //         direction j_opposite_dir{j_opposite->d};
 
-                        int sign = -1 + (j_opposite_dir % 2) * 2;
+                //         int sign = -1 + (j_opposite_dir % 2) * 2;
 
-                        if (j_opposite_dir == NORTH || j_opposite_dir == SOUTH){
-                            b.row(i) += RowVector2f{0.f, HA_STEP*sign};
+                //         if (j_opposite_dir == NORTH || j_opposite_dir == SOUTH){
+                //             b.row(i) += RowVector2f{0.f, HA_STEP*sign};
 
-                        } else {
-                            b.row(i) += RowVector2f{HA_STEP*sign, 0.f};
-                        }
+                //         } else {
+                //             b.row(i) += RowVector2f{HA_STEP*sign, 0.f};
+                //         }
 
-                        int j_opposite_index{j_opposite->index};
-                        triplets.push_back(T(i, j_opposite_index, -1.f));
-                    }
-                } else {
+                //         int j_opposite_index{j_opposite->index};
+                //         triplets.push_back(T(i, j_opposite_index, -1.f));
+                //     }
+                // }
+                else {
                     /// add standard laplacian contributions
                     triplets.push_back(T(i, j, -1.f));
                 }
@@ -120,9 +146,13 @@ QImage NormalMapGenerator::generate(){
 
     MatrixXf n{solver.solve(b)};
 
-    QImage nm(width, height, QImage::Format_RGB32);
+    QImage nm(width, height, QImage::Format_ARGB32);
     QRgb *data = reinterpret_cast<QRgb*>(nm.bits());
     eigenMatrixToQImage(n, data);
+    std::cout << qBlue(nm.pixel(0, 0)) << std::endl;
+    std::cout << qBlue(nm.pixel(1, 0)) << std::endl;
+    std::cout << qBlue(nm.pixel(2, 0)) << std::endl;
+
     return nm;
 }
 
@@ -146,9 +176,12 @@ void NormalMapGenerator::eigenMatrixToQImage(MatrixXf mat, QRgb *data){
                 nz = sqrt(i);
             assert(i <= 1);
 
-            data[index] = qRgb(std::clamp(nx, 0.f, 1.f)*255,
-                               std::clamp(ny, 0.f, 1.f)*255,
-                               std::clamp(nz, 0.f, 1.f)*255);
+            QRgb color{qRgb(std::clamp(nx, 0.f, 1.f)*255,
+                            std::clamp(ny, 0.f, 1.f)*255,
+                            std::clamp(nz, 0.f, 1.f)*255)};
+
+            data[index] = color;
+
         }
     }
 }
