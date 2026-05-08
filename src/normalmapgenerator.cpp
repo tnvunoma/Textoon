@@ -17,7 +17,7 @@ bool NormalMapGenerator::onAnySilhouette(QRgb *data, int i, std::vector<std::uni
     // dirichlet boundary condition
     for (const auto& n : neighbors){
         int j = n->index;
-        if (qRed(data[i]) > qRed(data[j])){
+        if (qRed(data[i]) < qRed(data[j])){
             return true;
         }
     }
@@ -74,20 +74,20 @@ void NormalMapGenerator::constructMatrices() {
             /// add depth step to RHS while enforcing constraint
             triplets.push_back(T(i, i, 1.f));
             //b.row(i) = RowVector2f{DEPTH_STEP, DEPTH_STEP};
-            for (const auto& n : neighbors){
-                int j = n->index;
-                direction drct = n->d;
+            // for (const auto& n : neighbors){
+            //     int j = n->index;
+            //     direction drct = n->d;
 
-                if (onSilhouette(data, i, j)){
-                    /// add depth step to RHS
-                    //int sign = -1 + (n->d % 2) * 2;
-                    if (drct == NORTH || drct == SOUTH){
-                        b.row(i) += RowVector2f{DEPTH_STEP, 0.f};
-                    } else {
-                        b.row(i) += RowVector2f{0.f, DEPTH_STEP};
-                    }
-                }
-            }
+            //     if (onSilhouette(data, i, j)){
+            //         /// add depth step to RHS
+            //         //int sign = -1 + (n->d % 2) * 2;
+            //         if (drct == NORTH || drct == SOUTH){
+            //             b.row(i) += RowVector2f{DEPTH_STEP, 0.f};
+            //         } else {
+            //             b.row(i) += RowVector2f{0.f, DEPTH_STEP};
+            //         }
+            //     }
+            // }
         }
         else {
             for (const auto& n : neighbors){
@@ -103,28 +103,30 @@ void NormalMapGenerator::constructMatrices() {
                     } else {
                         b.row(i) += RowVector2f{0.f, DEPTH_STEP*sign};
                     }
-                } else if (belowOccludingObject(data, i, j)){
-                    /// we're below a boundary, but suppose there was a ghost pixel there;
-                    /// we wnat the normals to be smooth and consistent with the neighbor in the opposite direciton and the ghost pixel.
-                    /// to do this, we can simply add the opposite direction neighbor in the laplacian and a height-step weight to the RHS
+                }
+                // else if (belowOccludingObject(data, i, j)){
+                //     /// we're below a boundary, but suppose there was a ghost pixel there;
+                //     /// we wnat the normals to be smooth and consistent with the neighbor in the opposite direciton and the ghost pixel.
+                //     /// to do this, we can simply add the opposite direction neighbor in the laplacian and a height-step weight to the RHS
 
-                    if (n->opposite_dir){
-                        NeighboringPixel * j_opposite{n->opposite_dir};
-                        direction j_opposite_dir{j_opposite->d};
+                //     if (n->opposite_dir){
+                //         NeighboringPixel * j_opposite{n->opposite_dir};
+                //         direction j_opposite_dir{j_opposite->d};
 
-                        int sign = -1 + (j_opposite_dir % 2) * 2;
+                //         int sign = -1 + (j_opposite_dir % 2) * 2;
 
-                        if (j_opposite_dir == NORTH || j_opposite_dir == SOUTH){
-                            b.row(i) += RowVector2f{0.f, HA_STEP*sign};
+                //         if (j_opposite_dir == NORTH || j_opposite_dir == SOUTH){
+                //             b.row(i) += RowVector2f{0.f, HA_STEP*sign};
 
-                        } else {
-                            b.row(i) += RowVector2f{HA_STEP*sign, 0.f};
-                        }
+                //         } else {
+                //             b.row(i) += RowVector2f{HA_STEP*sign, 0.f};
+                //         }
 
-                        int j_opposite_index{j_opposite->index};
-                        triplets.push_back(T(i, j_opposite_index, -1.f));
-                    }
-                } else {
+                //         int j_opposite_index{j_opposite->index};
+                //         triplets.push_back(T(i, j_opposite_index, -1.f));
+                //     }
+                // }
+                else {
                     /// add standard laplacian contributions
                     triplets.push_back(T(i, j, -1.f));
                 }
