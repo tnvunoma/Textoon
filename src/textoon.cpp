@@ -150,10 +150,15 @@ void Textoon::processFrames(const QString &inputFolder)
     //     normals
     //     );
 
+    // Lambertian shading
+    QImage shading0 = PostProcessing::lambertianShading(normals, QVector3D(0.f, 0.f, 1.f));
+    shading0.save(debugDir + "/shading_0000.png");
+
     // Render F0
     QImage rendered0 = textureMap.isEmpty()
                            ? prev.image
                            : textureInitFrame(rawLine0, prev.image, region0, textureMap);
+    rendered0 = PostProcessing::multiplyShading(rendered0, shading0);
     rendered0.save(outputFolder + "/frame_0000.png");
 
     // -------------------------------------
@@ -209,10 +214,15 @@ void Textoon::processFrames(const QString &inputFolder)
         //     normals
         //     );
 
+        // Lambertian shading
+        QImage shading = PostProcessing::lambertianShading(normals, QVector3D(0.f, 0.f, 1.f));
+        shading.save(debugDir + "/shading_" + frameId + ".png");
+
         // Render
         QImage rendered = textureMap.isEmpty()
                               ? curr.image
                               : render(rawLine, curr.image, curr.uv, regions, textureMap);
+        rendered = PostProcessing::multiplyShading(rendered, shading);
 
         QString out = outputFolder + QString("/frame_%1.png").arg(i, 4, 10, QChar('0'));
         rendered.save(out);

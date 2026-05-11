@@ -16,6 +16,14 @@ public:
         const QImage& segmentation,
         const std::vector<std::vector<QVector3D>>& normals);
 
+    static QImage lambertianShading(
+        const std::vector<std::vector<QVector3D>>& normals,
+        const QVector3D& lightDir);
+
+    static QImage multiplyShading(
+        const QImage& image,
+        const QImage& shading);
+
 };
 
 #endif // POSTPROCESSING_H
