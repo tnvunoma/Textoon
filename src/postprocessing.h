@@ -4,19 +4,18 @@
 #include <QImage>
 #include <QVector3D>
 #include <vector>
+#include "textoon.h"
 
 class PostProcessing
 {
 public:
-    struct UV
-    {
-        float u, v;
-    };
 
-    static std::vector<std::vector<UV>> textureRounding(
-        const std::vector<std::vector<UV>> &uv,
-        const QImage &segmentation,
-        const std::vector<std::vector<QVector3D>> &normals);
+    static std::vector<std::vector<Textoon::UV>>
+    textureRounding(
+        const std::vector<std::vector<Textoon::UV>>& uv,
+        const QImage& segmentation,
+        const std::vector<std::vector<QVector3D>>& normals);
+
 };
 
 #endif // POSTPROCESSING_H

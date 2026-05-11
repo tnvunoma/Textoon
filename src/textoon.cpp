@@ -9,6 +9,8 @@
 #include <QPoint>
 #include <fstream>
 #include "scribblecontext.h"
+#include "normalmapgenerator.h"
+#include "postprocessing.h"
 #include <iostream>
 
 struct FrameState
@@ -132,6 +134,22 @@ void Textoon::processFrames(const QString &inputFolder)
     // color with segmentation colors
     prev.image = applySegmentationColors(rawLine0, prev.segmentation);
 
+    // Generate normals from segmentation
+    NormalMapGenerator normalGen(&prev.segmentation);
+
+    QImage normalMap = normalGen.generate();
+
+    normalMap.save(debugDir + "/normal_0000.png");
+
+    auto normals = normalImageToVectors(normalMap);
+
+    // Texture rounding
+    // prev.uv = PostProcessing::textureRounding(
+    //     prev.uv,
+    //     prev.segmentation,
+    //     normals
+    //     );
+
     // Render F0
     QImage rendered0 = textureMap.isEmpty()
                            ? prev.image
@@ -174,6 +192,22 @@ void Textoon::processFrames(const QString &inputFolder)
 
         // UV transfer
         curr.uv = transferUV(prev.uv, W, regions);
+
+        // Generate normals from segmentation
+        NormalMapGenerator normalGen(&curr.segmentation);
+
+        QImage normalMap = normalGen.generate();
+
+        normalMap.save(debugDir + "/normal_" + frameId + ".png");
+
+        auto normals = normalImageToVectors(normalMap);
+
+        // Texture rounding
+        // curr.uv = PostProcessing::textureRounding(
+        //     curr.uv,
+        //     curr.segmentation,
+        //     normals
+        //     );
 
         // Render
         QImage rendered = textureMap.isEmpty()
@@ -283,6 +317,39 @@ Textoon::extractRegions(const QImage& segmentation)
     }
 
     return regions;
+}
+
+std::vector<std::vector<QVector3D>>
+Textoon::normalImageToVectors(const QImage& normalMap)
+{
+    int w = normalMap.width();
+    int h = normalMap.height();
+
+    std::vector<std::vector<QVector3D>> normals(
+        h,
+        std::vector<QVector3D>(w)
+        );
+
+    for (int y = 0; y < h; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            QColor c(normalMap.pixel(x, y));
+
+            float nx = (c.redF()   * 2.f) - 1.f;
+            float ny = (c.greenF() * 2.f) - 1.f;
+            float nz = (c.blueF()  * 2.f) - 1.f;
+
+            QVector3D n(nx, ny, nz);
+
+            if (n.lengthSquared() > 0.0f)
+                n.normalize();
+
+            normals[y][x] = n;
+        }
+    }
+
+    return normals;
 }
 
 std::vector<std::vector<float>> computeDistanceMap(
