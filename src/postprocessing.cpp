@@ -185,3 +185,60 @@ PostProcessing::textureRounding(
 
     return result;
 }
+
+QImage PostProcessing::multiplyShading(
+    const QImage& image,
+    const QImage& shading)
+{
+    int w = image.width();
+    int h = image.height();
+
+    QImage result(w, h, QImage::Format_ARGB32);
+
+    for (int y = 0; y < h; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            QColor c(image.pixel(x, y));
+            float s = qRed(shading.pixel(x, y)) / 255.f;
+
+            int r = static_cast<int>(c.red()   * s + 0.5f);
+            int g = static_cast<int>(c.green() * s + 0.5f);
+            int b = static_cast<int>(c.blue()  * s + 0.5f);
+
+            result.setPixel(x, y, qRgba(r, g, b, c.alpha()));
+        }
+    }
+
+    return result;
+}
+
+QImage PostProcessing::lambertianShading(
+    const std::vector<std::vector<QVector3D>>& normals,
+    const QVector3D& lightDir)
+{
+    int h = normals.size();
+    int w = normals[0].size();
+
+    QVector3D L = lightDir.normalized();
+
+    QImage result(w, h, QImage::Format_ARGB32);
+
+    for (int y = 0; y < h; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            const QVector3D& n = normals[y][x];
+
+            float intensity = 0.f;
+
+            if (n.lengthSquared() > 0.f)
+                intensity = std::max(0.f, QVector3D::dotProduct(n, L));
+
+            int val = static_cast<int>(intensity * 255.f + 0.5f);
+            result.setPixel(x, y, qRgb(val, val, val));
+        }
+    }
+
+    return result;
+}
