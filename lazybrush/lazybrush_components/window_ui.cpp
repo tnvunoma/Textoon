@@ -31,6 +31,8 @@
 #include <QHBoxLayout>
 #include <QFormLayout>
 #include <QFileDialog>
+#include <QPainter>
+#include <QtMath>
 
 void
 lzwindow::setup_ui_()
@@ -70,6 +72,8 @@ lzwindow::setup_ui_()
     QVBoxLayout * layout_brush= new QVBoxLayout;
     QFormLayout * layout_brush_contents = new QFormLayout;
     QHBoxLayout * layout_brush_contents_size = new QHBoxLayout;
+    QVBoxLayout * layout_light = new QVBoxLayout;
+
     QSlider * slider_brush_size = new QSlider(Qt::Horizontal);
     slider_brush_size->setRange(3, 50);
     slider_brush_size->setValue(brush_size_);
@@ -83,6 +87,7 @@ lzwindow::setup_ui_()
     QCheckBox * check_box_use_implicit_scribble = new QCheckBox;
     check_box_use_implicit_scribble->setChecked(use_implicit_scribble_);
     QCheckBox * check_box_show_scribbles = new QCheckBox;
+
     check_box_show_scribbles->setChecked(show_scribbles_);
 
     main_layout->setContentsMargins(0, 0, 0, 0);
@@ -112,6 +117,12 @@ lzwindow::setup_ui_()
             layout_brush->setContentsMargins(0, 0, 0, 0);
             layout_brush->setSpacing(5);
             layout_brush->addWidget(new QLabel("Brush Options:"));
+
+            layout_light->setContentsMargins(0, 0, 0, 0);
+            layout_light->setSpacing(5);
+            layout_light->addWidget(new QLabel("Light Controls:"));
+            layout_light->addWidget(createLightSliderControls());
+
                 layout_brush_contents->setContentsMargins(10, 0, 0, 0);
                 layout_brush_contents->setSpacing(5);
                     layout_brush_contents_size->setContentsMargins(0, 0, 0, 0);
@@ -122,6 +133,7 @@ lzwindow::setup_ui_()
                 layout_brush_contents->addRow("Color:", widget_palette_);
             layout_brush->addLayout(layout_brush_contents);
 
+
             layout_other_options->setContentsMargins(0, 0, 0, 0);
             layout_other_options->setSpacing(5);
             layout_other_options->addWidget(new QLabel("Other Options:"));
@@ -130,12 +142,15 @@ lzwindow::setup_ui_()
                 layout_other_options_contents->addRow("Use Implicit Surrounding Background Scribble:", check_box_use_implicit_scribble);
                 layout_other_options_contents->addRow("Show Scribbles:", check_box_show_scribbles);
             layout_other_options->addLayout(layout_other_options_contents);
-            
+
         tools_layout->addLayout(layout_io);
         tools_layout->addLayout(layout_visualization);
         tools_layout->addLayout(layout_brush);
         tools_layout->addLayout(layout_other_options);
+        tools_layout->addLayout(layout_light);
+
         tools_layout->addStretch();
+
 
     main_layout->addLayout(tools_layout);
     main_layout->addWidget(widget_container_image_, 1);
@@ -228,6 +243,9 @@ lzwindow::setup_ui_()
 
             labeling_image_ = QImage(original_image_.width(), original_image_.height(), QImage::Format_ARGB32);
             labeling_image_.fill(0);
+
+            x_limit = original_image_.width(), y_limit = original_image_.height();
+            updateLightSliderLimits();
 
             position_ = QPointF(0.0, 0.0);
             scale_ = 1.0;
@@ -327,20 +345,142 @@ lzwindow::setup_ui_()
     );
 }
 
+/*
+ *
+ *
+Select move tool -> deselect move tool for easier ui navi
+
+
+
+Questions to still figure out:
+
+
+Actionable components:
+    Create internal data structure for light with just XYZ
+    Create UI attributes for internal light object
+    Create update function between the two
+
+lightSliderControls(){
+    I want a slider control that corresponds to attributes of some UI Light object.
+        Some of the aspects of the sliders can include:
+            controls for the x, y, z, azimuthal angle, incidental angle (?)
+}
+
+renderLight(){
+    Renders a transparent, non-interactable light icon according to where the XYZ positions of the
+    UI Light object are.
+}
+*/
+
 void lzwindow::onSaveScribblesClicked(){
     if (scribble_context->size().isEmpty()){
         scribble_context->saveScribblesWithoutImageSize();
     } else {
         scribble_context->saveScribblesWithImageSize();
-
-        // QImage segmentation_image{scribble_context->colorize
-        //                           (scribble_context->getScribblesAsImage())};
-        // QDir().mkpath("saved_scribbles");
-
-        // QString filename = "saved_scribbles/segmentation_combined.png";
-
-        // if (!segmentation_image.save(filename)) {
-        //     std::cerr << "Failed to save scribbles." << std::endl;
-        // }
     }
+}
+
+void lzwindow::updateLightFromAngles()
+{
+    float r = qMax(glbLight->z, 1.f);
+
+    float az = qDegreesToRadians(glbLight->azimuth);
+    float inc = qDegreesToRadians(glbLight->inclination);
+
+    glbLight->x = r * qCos(inc) * qCos(az);
+    glbLight->y = r * qCos(inc) * qSin(az);
+    glbLight->z = r * qSin(inc);
+}
+
+void lzwindow::updateLightSliderLimits()
+{
+    if (!light_x_slider_ || !light_y_slider_) {
+        return;
+    }
+
+    light_x_slider_->setRange(0, x_limit);
+    light_y_slider_->setRange(0, y_limit);
+
+    glbLight->x = std::min(std::max(glbLight->x, 0.f), x_limit);
+    glbLight->y = std::min(std::max(glbLight->y, 0.f), y_limit);
+
+    light_x_slider_->setValue(glbLight->x);
+    light_y_slider_->setValue(glbLight->y);
+
+    if (light_x_label_) {
+        light_x_label_->setText(QString::number(glbLight->x));
+    }
+
+    if (light_y_label_) {
+        light_y_label_->setText(QString::number(glbLight->y));
+    }
+
+    widget_container_image_->update();
+}
+
+QWidget* lzwindow::createLightSliderControls()
+{
+    QWidget* panel = new QWidget;
+    QFormLayout* layout = new QFormLayout(panel);
+
+    auto makeSlider = [&](QString name, int min, int max, int value, auto onChanged)
+    {
+        QWidget* row = new QWidget;
+        QHBoxLayout* rowLayout = new QHBoxLayout(row);
+        rowLayout->setContentsMargins(0, 0, 0, 0);
+
+        QSlider* slider = new QSlider(Qt::Horizontal);
+        slider->setRange(min, max);
+        slider->setValue(value);
+
+        QLabel* label = new QLabel(QString::number(value));
+
+        rowLayout->addWidget(slider);
+        rowLayout->addWidget(label);
+
+        connect(slider, &QSlider::valueChanged, this,
+                [=](int v)
+                {
+                    label->setText(QString::number(v));
+                    onChanged(v);
+                    widget_container_image_->update();
+                });
+
+        layout->addRow(name, row);
+
+        return std::pair<QSlider*, QLabel*>(slider, label);
+    };
+
+    auto [xSlider, xLabel] =
+        makeSlider("Light X:", 0, x_limit > 0 ? x_limit : 0, glbLight->x,
+                   [this](int v) { glbLight->x = v; });
+
+    light_x_slider_ = xSlider;
+    light_x_label_ = xLabel;
+
+    auto [ySlider, yLabel] =
+        makeSlider("Light Y:", 0, y_limit > 0 ? y_limit : 0, glbLight->y,
+                   [this](int v) { glbLight->y = v; });
+
+    light_y_slider_ = ySlider;
+    light_y_label_ = yLabel;
+
+    makeSlider("Light Z:", 0, 500, glbLight->z,
+               [this](int v) { glbLight->z = v; });
+
+    makeSlider("Azimuth:", 0, 360, glbLight->azimuth,
+               [this](int v)
+               {
+                   glbLight->azimuth = v;
+                   //updateLightFromAngles();
+               });
+
+    makeSlider("Inclination:", -90, 90, glbLight->inclination,
+               [this](int v)
+               {
+                   glbLight->inclination = v;
+                   //updateLightFromAngles();
+               });
+
+    return panel;
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include <Eigen/Dense>
 #include <Eigen/SparseCholesky>
+#include <QVector3D>
 
 const float EPSILON = 1e-4;
 //const float SMOL_EPSILON = 1e-8;
@@ -17,10 +18,21 @@ inline bool isSPD(Eigen::SparseMatrix<float> mat){
             if (eigenvalues[x] <= 0.f)
                 return false;
         }
-
         return true;
     }
     return false;
+}
+
+inline QVector3D lightDirectionFromAngles(float azimuthDeg, float inclinationDeg)
+{
+    float az = qDegreesToRadians(azimuthDeg);
+    float inc = qDegreesToRadians(inclinationDeg);
+
+    float x = qCos(inc) * qCos(az);
+    float y = qCos(inc) * qSin(az);
+    float z = qSin(inc);
+
+    return QVector3D(x, y, z).normalized();
 }
 
 inline int getFromVector(Eigen::Vector3i v, int index){

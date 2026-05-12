@@ -231,12 +231,14 @@ QImage PostProcessing::multiplyShading(
 
     QImage result(w, h, QImage::Format_ARGB32);
 
+    float shading_scaling = 0.75f;
+
     for (int y = 0; y < h; ++y)
     {
         for (int x = 0; x < w; ++x)
         {
             QColor c(image.pixel(x, y));
-            float s = qRed(shading.pixel(x, y)) / 255.f;
+            float s = qRed(shading.pixel(x, y) * shading_scaling) / 255.f;
 
             int r = static_cast<int>(c.red()   * s + 0.5f);
             int g = static_cast<int>(c.green() * s + 0.5f);
@@ -259,6 +261,8 @@ QImage PostProcessing::lambertianShading(
     QVector3D L = lightDir.normalized();
 
     QImage result(w, h, QImage::Format_ARGB32);
+
+
 
     for (int y = 0; y < h; ++y)
     {

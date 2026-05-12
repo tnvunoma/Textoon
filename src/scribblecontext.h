@@ -10,6 +10,15 @@
 //ScribbleContext::ScribbleContext() {}
 
 
+struct GlobalLight {
+    float x = 0.f;
+    float y = 0.f;
+    float z = 100.f;
+
+    float azimuth = 45.f;     // phi
+    float inclination = 45.f; // theta
+};
+
 class ScribbleInfo
 {
     using textoons_colorization_context = lazybrush::grid_of_quadtrees_colorizer::colorization_context<ScribbleInfo>;
@@ -169,26 +178,6 @@ public:
 
     std::unordered_set<short> collectLabelsFromScribbles();
     std::map<QRgb, short> generateColorToColorInfoMap();
-
-
-    /*
-std::map<QRgb, ColorInfo> generateColorToColorInfoMap();
-
-std::map<QRgb, ColorInfo> ScribbleContext::generateColorToColorInfoMap(){
-    // generate a map from labels
-    std::map<QRgb, ColorInfo> map;
-    for (const ScribbleInfo& scrib : std::as_const(saved_scribbles)){
-
-        ColorInfo info{scrib._label, scrib._depth};
-        QColor color(
-            static_cast<unsigned char>(the_palette[label][0]),
-            static_cast<unsigned char>(the_palette[label][1]),
-            static_cast<unsigned char>(the_palette[label][2]));
-        map[color.rgba()] = info;
-    }
-    return map;
-}
-*/
 
     QVector<ScribbleInfo> extractScribblesFromQImage(const QImage& scribbles_image);
     QImage createMaskByColor(const QRect& bounding, const QImage& original, const QColor& color);

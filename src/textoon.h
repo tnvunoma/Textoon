@@ -9,11 +9,13 @@
 
 using namespace Eigen;
 
+
+
 class Textoon
 {
 
 public:
-    Textoon(ScribbleContext* scribble_context) : scribbleContext(scribble_context) {};
+    Textoon(ScribbleContext* scribble_context, GlobalLight* glb_light) : scribbleContext(scribble_context), glbLight(glb_light) {};
 
     void processFolder(const QString &inputFolder, const QString &anim_name);
 
@@ -24,6 +26,7 @@ public:
 
 private:
     ScribbleContext* scribbleContext;
+    GlobalLight *glbLight;
 
     QString outputFolder;
     QString anim_nm;

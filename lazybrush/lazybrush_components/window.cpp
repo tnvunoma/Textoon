@@ -34,8 +34,9 @@
 
 
 
-lzwindow::lzwindow(ScribbleContext* scribble_context) :
-    scribble_context(scribble_context)
+lzwindow::lzwindow(ScribbleContext* scribble_context,  GlobalLight *glb_light) :
+    scribble_context(scribble_context),
+    glbLight(glb_light)
     , position_(0.0, 0.0)
     , scale_(1.0)
     , last_mouse_position_(0, 0)
@@ -79,6 +80,7 @@ lzwindow::eventFilter(QObject *o, QEvent *e)
             QPointF image_position(-(preprocessed_image_.width() / 2.0), -(preprocessed_image_.height() / 2.0));
 
             painter.save();
+            renderLight(painter);
             if (visualization_mode_ == visualization_mode_original_image)
             {
                 painter.drawImage(image_position, original_image_);
@@ -625,3 +627,35 @@ lzwindow::QRect_to_rect_type(QRect const & rect)
 {
     return rect_type(rect.x(), rect.y(), rect.width(), rect.height());
 }
+
+
+void lzwindow::renderLight(QPainter& painter)
+{
+    if (!widget_container_image_) return;
+
+    painter.save();
+
+    painter.setRenderHint(QPainter::Antialiasing);
+
+    QPointF center = QPoint(0, 0);
+
+    QPointF lightPos =
+        original_image_.rect().topLeft()
+                       + QPointF(-original_image_.size().width()/2, -original_image_.size().height()/2)
+                       + QPointF(glbLight->x, glbLight->y);
+
+    QColor fill(255, 230, 80, 120);
+    QColor outline(255, 200, 40, 180);
+
+    painter.setBrush(fill);
+    painter.setPen(QPen(outline, 2));
+
+    painter.drawEllipse(lightPos, 10, 10);
+
+    painter.setPen(QPen(outline, 1));
+    painter.drawLine(lightPos + QPointF(-14, 0), lightPos + QPointF(14, 0));
+    painter.drawLine(lightPos + QPointF(0, -14), lightPos + QPointF(0, 14));
+
+    painter.restore();
+}
+

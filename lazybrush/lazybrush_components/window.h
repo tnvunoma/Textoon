@@ -19,6 +19,8 @@
 #define WINDOW_H
 
 #include <QWidget>
+#include <QSlider>
+#include <QLabel>s
 
 #include <lazybrush/lazybrush_include/grid_of_quadtrees_colorizer/colorization_context.hpp>
 #include "src/scribblecontext.h"
@@ -42,7 +44,7 @@ class lzwindow : public QWidget
     Q_OBJECT    
 
 public:
-    explicit lzwindow(ScribbleContext* scribble_context = nullptr);
+    explicit lzwindow(ScribbleContext* scribble_context = nullptr, GlobalLight *glb_light = nullptr);
 
     ~lzwindow();
 
@@ -51,6 +53,12 @@ protected:
     eventFilter(QObject *o, QEvent *e) override;
 
 private:
+    GlobalLight* glbLight;
+
+    QWidget* createLightSliderControls();
+    void renderLight(QPainter& painter);
+    void updateLightFromAngles();
+
     ScribbleContext* scribble_context;
     enum painting_device_types
     {
@@ -94,6 +102,17 @@ private:
     int selected_background_color_index_;
     bool use_implicit_scribble_;
     bool show_scribbles_;
+
+    QSlider* light_x_slider_ = nullptr;
+    QSlider* light_y_slider_ = nullptr;
+
+    QLabel* light_x_label_ = nullptr;
+    QLabel* light_y_label_ = nullptr;
+
+    float x_limit = 0.f;
+    float y_limit = 0.f;
+
+    void updateLightSliderLimits();
 
     void
     setup_ui_();

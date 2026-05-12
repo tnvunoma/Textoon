@@ -22,15 +22,17 @@ int main(int argc, char *argv[])
     QString inputFolder = args[1];
     QString anim_name = args[2];
 
+    GlobalLight* glbLight = new GlobalLight();
+
     ScribbleContext* scribble_context = new ScribbleContext(nullptr, inputFolder);
-    Textoon* processor = new Textoon(scribble_context);
+    Textoon* processor = new Textoon(scribble_context, glbLight);
 
     QObject::connect(scribble_context, &ScribbleContext::scribblesUpdated,
                      [processor, inputFolder, anim_name]() {
                         processor->processFolder(inputFolder, anim_name);
                      });
 
-    lzwindow* lazyb_window = new lzwindow(scribble_context);
+    lzwindow* lazyb_window = new lzwindow(scribble_context, glbLight);
     lazyb_window->show();
 
 

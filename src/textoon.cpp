@@ -43,6 +43,7 @@ QImage Textoon::loadInitialScribbles(const QString& inputFolder)
     return img;
 }
 
+
 static std::vector<std::vector<int>> loadCsv(const std::string &path)
 {
     std::vector<std::vector<int>> data;
@@ -151,7 +152,8 @@ void Textoon::processFrames(const QString &inputFolder)
     //     );
 
     // Lambertian shading
-    QImage shading0 = PostProcessing::lambertianShading(normals, QVector3D(0.f, 0.f, 1.f));
+    QVector3D glbLightDir{lightDirectionFromAngles(glbLight->azimuth, glbLight->inclination)};
+    QImage shading0 = PostProcessing::lambertianShading(normals, glbLightDir);
     shading0.save(debugDir + "/shading_0000.png");
 
     // Render F0
@@ -215,7 +217,7 @@ void Textoon::processFrames(const QString &inputFolder)
         //     );
 
         // Lambertian shading
-        QImage shading = PostProcessing::lambertianShading(normals, QVector3D(0.f, 0.f, 1.f));
+        QImage shading = PostProcessing::lambertianShading(normals, glbLightDir);
         shading.save(debugDir + "/shading_" + frameId + ".png");
 
         // Render
