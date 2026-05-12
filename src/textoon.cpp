@@ -120,7 +120,7 @@ void Textoon::processFrames(const QString &inputFolder)
     QDir().mkpath(debugDir);
 
     prev.scribbles = loadInitialScribbles(inputFolder);
-    // prev.scribbles = dilateScribbles(prev.scribbles, 2);
+    prev.scribbles = dilateScribbles(prev.scribbles, 1);
     QImage debugScribbles0 = overlayScribbles(rawLine0, prev.scribbles);
     debugScribbles0.save(debugDir + "/scribbles_0000.png");
 
@@ -145,11 +145,11 @@ void Textoon::processFrames(const QString &inputFolder)
     auto normals = normalImageToVectors(normalMap);
 
     // Texture rounding
-    // prev.uv = PostProcessing::textureRounding(
-    //     prev.uv,
-    //     prev.segmentation,
-    //     normals
-    //     );
+    auto roundedUV0 =
+        PostProcessing::textureRounding(
+            prev.uv,
+            prev.segmentation,
+            normals);
 
     // Lambertian shading
     QVector3D glbLightDir{lightDirectionFromAngles(glbLight->azimuth, glbLight->inclination)};
@@ -157,9 +157,15 @@ void Textoon::processFrames(const QString &inputFolder)
     shading0.save(debugDir + "/shading_0000.png");
 
     // Render F0
-    QImage rendered0 = textureMap.isEmpty()
-                           ? prev.image
-                           : textureInitFrame(rawLine0, prev.image, region0, textureMap);
+    QImage rendered0 =
+        textureMap.isEmpty()
+            ? prev.image
+            : textureInitFrame(
+                  rawLine0,
+                  prev.image,
+                  roundedUV0,
+                  region0,
+                  textureMap);
     rendered0 = PostProcessing::multiplyShading(rendered0, shading0);
     rendered0.save(outputFolder + "/frame_0000.png");
 
@@ -185,7 +191,7 @@ void Textoon::processFrames(const QString &inputFolder)
 
         // Transfer scribbles
         curr.scribbles = warpImage(prev.scribbles, W);
-        // curr.scribbles = dilateScribbles(curr.scribbles, 15);
+        curr.scribbles = dilateScribbles(curr.scribbles, 1);
         QImage debugScribbles = overlayScribbles(rawLine, curr.scribbles);
         debugScribbles.save(debugDir + "/scribbles_" + frameId + ".png");
 
@@ -210,20 +216,26 @@ void Textoon::processFrames(const QString &inputFolder)
         auto normals = normalImageToVectors(normalMap);
 
         // Texture rounding
-        // curr.uv = PostProcessing::textureRounding(
-        //     curr.uv,
-        //     curr.segmentation,
-        //     normals
-        //     );
+        auto roundedUV =
+            PostProcessing::textureRounding(
+                curr.uv,
+                curr.segmentation,
+                normals);
 
         // Lambertian shading
         QImage shading = PostProcessing::lambertianShading(normals, glbLightDir);
         shading.save(debugDir + "/shading_" + frameId + ".png");
 
         // Render
-        QImage rendered = textureMap.isEmpty()
-                              ? curr.image
-                              : render(rawLine, curr.image, curr.uv, regions, textureMap);
+        QImage rendered =
+            textureMap.isEmpty()
+                ? curr.image
+                : render(
+                      rawLine,
+                      curr.image,
+                      roundedUV,
+                      regions,
+                      textureMap);
         rendered = PostProcessing::multiplyShading(rendered, shading);
 
         QString out = outputFolder + QString("/frame_%1.png").arg(i, 4, 10, QChar('0'));
@@ -250,9 +262,13 @@ std::vector<std::vector<Textoon::UV>> Textoon::initUV(int w, int h)
 QImage Textoon::textureInitFrame(
     const QImage&                              lineArt,
     const QImage&                              coloredLineArt,
+    const std::vector<std::vector<UV>>&        T,
     const std::map<QRgb, std::vector<QPoint>>& regions,
     const QMap<QRgb, QImage>&                  textureMap)
 {
+    int w = lineArt.width();
+    int h = lineArt.height();
+
     QImage out  = coloredLineArt.convertToFormat(QImage::Format_RGB32);
     QImage line = lineArt.convertToFormat(QImage::Format_RGB32);
 
@@ -268,15 +284,36 @@ QImage Textoon::textureInitFrame(
             int x = p.x();
             int y = p.y();
 
-            // texture pixel directly maps to frame pixel
-            QRgb texPx  = reinterpret_cast<const QRgb*>(tex.scanLine(y))[x];
-            QRgb linePx = reinterpret_cast<const QRgb*>(line.scanLine(y))[x];
+            float u =
+                std::clamp(T[y][x].u, 0.f, 1.f);
 
-            int r = (qRed(linePx)   * qRed(texPx))   / 255;
-            int g = (qGreen(linePx) * qGreen(texPx)) / 255;
-            int b = (qBlue(linePx)  * qBlue(texPx))  / 255;
+            float v =
+                std::clamp(T[y][x].v, 0.f, 1.f);
 
-            reinterpret_cast<QRgb*>(out.scanLine(y))[x] = qRgb(r, g, b);
+            int tx = int(u * (tex.width()  - 1));
+            int ty = int(v * (tex.height() - 1));
+
+            QRgb texPx =
+                reinterpret_cast<const QRgb*>(
+                    tex.scanLine(ty))[tx];
+
+            QRgb linePx =
+                reinterpret_cast<const QRgb*>(
+                    line.scanLine(y))[x];
+
+            // multiply texture under lineart
+            int r =
+                (qRed(linePx) * qRed(texPx)) / 255;
+
+            int g =
+                (qGreen(linePx) * qGreen(texPx)) / 255;
+
+            int b =
+                (qBlue(linePx) * qBlue(texPx)) / 255;
+
+            reinterpret_cast<QRgb*>(
+                out.scanLine(y))[x] =
+                qRgb(r, g, b);
         }
     }
 
@@ -530,38 +567,38 @@ QImage Textoon::warpImage(
     return dst;
 }
 
-// QImage Textoon::dilateScribbles(const QImage& img, int radius)
-// {
-//     int w = img.width();
-//     int h = img.height();
-//     QImage out(w, h, QImage::Format_ARGB32);
-//     out.fill(Qt::transparent);
+QImage Textoon::dilateScribbles(const QImage& img, int radius)
+{
+    int w = img.width();
+    int h = img.height();
+    QImage out(w, h, QImage::Format_ARGB32);
+    out.fill(Qt::transparent);
 
-//     for (int y = 0; y < h; ++y)
-//     {
-//         for (int x = 0; x < w; ++x)
-//         {
-//             for (int dy = -radius; dy <= radius; ++dy)
-//             {
-//                 for (int dx = -radius; dx <= radius; ++dx)
-//                 {
-//                     int nx = x + dx;
-//                     int ny = y + dy;
-//                     if (nx < 0 || nx >= w || ny < 0 || ny >= h)
-//                         continue;
+    for (int y = 0; y < h; ++y)
+    {
+        for (int x = 0; x < w; ++x)
+        {
+            for (int dy = -radius; dy <= radius; ++dy)
+            {
+                for (int dx = -radius; dx <= radius; ++dx)
+                {
+                    int nx = x + dx;
+                    int ny = y + dy;
+                    if (nx < 0 || nx >= w || ny < 0 || ny >= h)
+                        continue;
 
-//                     QColor c(img.pixel(nx, ny));
-//                     if (c.alpha() == 0) continue;
+                    QColor c(img.pixel(nx, ny));
+                    if (c.alpha() == 0) continue;
 
-//                     out.setPixelColor(x, y, c);
-//                     goto next_pixel;
-//                 }
-//             }
-//         next_pixel:;
-//         }
-//     }
-//     return out;
-// }
+                    out.setPixelColor(x, y, c);
+                    goto next_pixel;
+                }
+            }
+        next_pixel:;
+        }
+    }
+    return out;
+}
 
 QImage Textoon::overlayScribbles(
     const QImage& base,
