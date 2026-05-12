@@ -37,6 +37,7 @@ private:
     QImage textureInitFrame(
         const QImage&                              lineArt,
         const QImage&                              coloredLineArt,
+        const std::vector<std::vector<UV>>&        T,
         const std::map<QRgb, std::vector<QPoint>>& regions,
         const QMap<QRgb, QImage>&                  textureMap);
 

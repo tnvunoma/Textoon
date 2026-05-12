@@ -4,13 +4,25 @@
 #include <cmath>
 #include <unordered_map>
 #include "textoon.h"
+#include "iostream"
 
+#include "postprocessing.h"
+
+#include <Eigen/Sparse>
+#include <unordered_map>
+#include <map>
+#include <cmath>
+#include <algorithm>
 
 using SpMat = Eigen::SparseMatrix<double>;
 using EigenTriplet = Eigen::Triplet<double>;
-struct QPointHash {
-    size_t operator()(const QPoint& p) const {
-        return std::hash<int>()(p.x()) ^ (std::hash<int>()(p.y()) << 1);
+
+struct QPointHash
+{
+    size_t operator()(const QPoint& p) const
+    {
+        return std::hash<int>()(p.x()) ^
+               (std::hash<int>()(p.y()) << 1);
     }
 };
 
@@ -25,9 +37,9 @@ PostProcessing::textureRounding(
 
     auto result = uv;
 
-    // ---------------------------------
-    // Build regions from segmentation
-    // ---------------------------------
+    // ------------------------------------------------------------
+    // Build regions
+    // ------------------------------------------------------------
     std::map<QRgb, std::vector<QPoint>> regions;
 
     for (int y = 0; y < h; ++y)
@@ -35,54 +47,94 @@ PostProcessing::textureRounding(
         for (int x = 0; x < w; ++x)
         {
             QRgb c = segmentation.pixel(x, y);
-            if (c == qRgb(0, 0, 0))
-                continue; // skip background if needed
+
+            if (qAlpha(c) == 0)
+                continue;
+
             regions[c].push_back(QPoint(x, y));
         }
     }
 
-    // ---------------------------------
-    // 2. Solve per region
-    // ---------------------------------
-    for (const auto &[color, pixels] : regions)
+    // ------------------------------------------------------------
+    // Per-region bulge
+    // ------------------------------------------------------------
+    for (const auto& [color, pixels] : regions)
     {
-        int n = pixels.size();
-        if (n < 10)
+        if (pixels.size() < 10)
             continue;
 
-        // ---------------------------------
-        // Compute region centroid
-        // ---------------------------------
-        float cx = 0.f;
-        float cy = 0.f;
+        // --------------------------------------------------------
+        // Build boundary mask
+        // --------------------------------------------------------
+        std::unordered_set<QPoint, QPointHash> boundary;
+
+        const int dx4[4] = {1, -1, 0, 0};
+        const int dy4[4] = {0, 0, 1, -1};
 
         for (const QPoint& p : pixels)
         {
-            cx += p.x();
-            cy += p.y();
+            int x = p.x();
+            int y = p.y();
+
+            bool isBoundary = false;
+
+            for (int k = 0; k < 4; ++k)
+            {
+                int nx = x + dx4[k];
+                int ny = y + dy4[k];
+
+                if (nx < 0 || ny < 0 || nx >= w || ny >= h)
+                {
+                    isBoundary = true;
+                    break;
+                }
+
+                if (segmentation.pixel(nx, ny) != color)
+                {
+                    isBoundary = true;
+                    break;
+                }
+            }
+
+            if (isBoundary)
+                boundary.insert(p);
         }
 
-        cx /= float(n);
-        cy /= float(n);
+        // --------------------------------------------------------
+        // Distance-to-boundary field
+        // --------------------------------------------------------
+        std::unordered_map<QPoint, float, QPointHash> distField;
 
-        // ---------------------------------
-        // Compute max radius
-        // ---------------------------------
         float maxDist = 1.f;
 
         for (const QPoint& p : pixels)
         {
-            float dx = p.x() - cx;
-            float dy = p.y() - cy;
+            if (boundary.contains(p))
+            {
+                distField[p] = 0.f;
+                continue;
+            }
 
-            float d = std::sqrt(dx * dx + dy * dy);
+            float best = 1e9f;
 
-            maxDist = std::max(maxDist, d);
+            for (const QPoint& b : boundary)
+            {
+                float dx = float(p.x() - b.x());
+                float dy = float(p.y() - b.y());
+
+                float d = std::sqrt(dx * dx + dy * dy);
+
+                if (d < best)
+                    best = d;
+            }
+
+            distField[p] = best;
+            maxDist = std::max(maxDist, best);
         }
 
-        // ---------------------------------
-        // Apply bulge deformation
-        // ---------------------------------
+        // --------------------------------------------------------
+        // Apply bevel-like deformation
+        // --------------------------------------------------------
         const float BULGE_STRENGTH = 0.03f;
 
         for (const QPoint& p : pixels)
@@ -90,132 +142,44 @@ PostProcessing::textureRounding(
             int x = p.x();
             int y = p.y();
 
-            float dx = x - cx;
-            float dy = y - cy;
-
-            float dist = std::sqrt(dx * dx + dy * dy);
-
-            if (dist < 1e-5f)
-                continue;
-
-            // normalized radial direction
-            dx /= dist;
-            dy /= dist;
-
-            // paraboloid falloff
-            float t = dist / maxDist;
-
-            float bulge =
-                BULGE_STRENGTH * (1.f - t * t);
-
-            // normal influence
             QVector3D nrm = normals[y][x];
 
-            float normalScale =
-                std::sqrt(
-                    nrm.x() * nrm.x() +
-                    nrm.y() * nrm.y());
+            // normal map [0,1] -> [-1,1]
+            float nx = (nrm.x() * 2.f) - 1.f;
+            float ny = (nrm.y() * 2.f) - 1.f;
 
-            bulge *= (0.5f + normalScale);
+            float mag = std::sqrt(nx * nx + ny * ny);
 
-            result[y][x].u += dx * bulge;
-            result[y][x].v += dy * bulge;
-        }
+            if (mag < 1e-5f)
+                continue;
 
-        // map pixel -> local index
-        std::unordered_map<QPoint, int, QPointHash> idx;
-        for (int i = 0; i < n; ++i)
-            idx[pixels[i]] = i;
+            nx /= mag;
+            ny /= mag;
 
-        std::vector<EigenTriplet> triplets;
-        Eigen::VectorXd bu(n), bv(n);
-        bu.setZero();
-        bv.setZero();
+            // ----------------------------------------------------
+            // Edge weighting
+            // 1 at boundary
+            // 0 toward center
+            // ----------------------------------------------------
+            float d = distField[p] / maxDist;
 
-        for (int i = 0; i < n; ++i)
-        {
-            int x = pixels[i].x();
-            int y = pixels[i].y();
+            // smooth bevel falloff
+            float edgeWeight =
+                std::exp(-4.0f * d);
 
-            double diag = 0.0;
-            bool isBoundary = false;
+            float amount =
+                BULGE_STRENGTH * edgeWeight;
 
-            const int dx[4] = {1, -1, 0, 0};
-            const int dy[4] = {0, 0, 1, -1};
+            // push UVs opposite normal
+            result[y][x].u -= nx * amount;
+            result[y][x].v -= ny * amount;
 
-            for (int k = 0; k < 4; ++k)
-            {
-                int nx = x + dx[k];
-                int ny = y + dy[k];
+            // avoid invalid UVs
+            result[y][x].u =
+                std::clamp(result[y][x].u, 0.f, 1.f);
 
-                if (nx < 0 || ny < 0 || nx >= w || ny >= h)
-                    continue;
-
-                if (segmentation.pixel(nx, ny) != color)
-                {
-                    isBoundary = true;
-                    continue;
-                }
-
-                int j = idx[QPoint(nx, ny)];
-
-                // weight from normals
-                double hi = std::sqrt(
-                    normals[y][x].x() * normals[y][x].x() +
-                    normals[y][x].y() * normals[y][x].y());
-
-                double hj = std::sqrt(
-                    normals[ny][nx].x() * normals[ny][nx].x() +
-                    normals[ny][nx].y() * normals[ny][nx].y());
-
-                double diff = hi - hj;
-                double w_ij = 1.0 / std::sqrt(1.0 + diff * diff);
-
-                triplets.emplace_back(i, j, -w_ij);
-                diag += w_ij;
-            }
-
-            if (isBoundary)
-            {
-                // Dirichlet constraint
-                triplets.emplace_back(i, i, 1.0);
-                bu[i] = result[y][x].u;
-                bv[i] = result[y][x].v;
-            }
-            else
-            {
-                triplets.emplace_back(i, i, diag);
-            }
-        }
-
-        // ---------------------------------
-        // Solve region
-        // ---------------------------------
-        SpMat L(n, n);
-        L.setFromTriplets(triplets.begin(), triplets.end());
-
-        Eigen::SimplicialLDLT<SpMat> solver;
-        solver.compute(L);
-
-        if (solver.info() != Eigen::Success)
-            continue;
-
-        Eigen::VectorXd fu = solver.solve(bu);
-        Eigen::VectorXd fv = solver.solve(bv);
-
-        if (solver.info() != Eigen::Success)
-            continue;
-
-        // ---------------------------------
-        // Write back
-        // ---------------------------------
-        for (int i = 0; i < n; ++i)
-        {
-            int x = pixels[i].x();
-            int y = pixels[i].y();
-
-            result[y][x].u = fu[i];
-            result[y][x].v = fv[i];
+            result[y][x].v =
+                std::clamp(result[y][x].v, 0.f, 1.f);
         }
     }
 
